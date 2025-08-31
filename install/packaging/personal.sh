@@ -150,10 +150,7 @@ echo "Installing CLI tools..."
 if [ -z "$OMARCHY_BARE" ]; then
   # CLI tools installation
   yay -S --noconfirm --needed \
-    trash-cli \
-    libfido2 \
-    libpam-u2f \
-    openssh
+    trash-cli
 fi
 
 echo "CLI tools installation complete."

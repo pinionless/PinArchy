@@ -9,7 +9,7 @@
 #
 
 # Install required FIDO2 packages
-sudo pacman -S --noconfirm --needed libfido2 pam-u2f
+sudo pacman -S --noconfirm --needed libfido2 pam-u2f openssh
 
 # Create FIDO2 configuration directory and prepare four security level authfiles:
 # - /etc/fido2/no-touch: Presence only (no touch, no PIN)

@@ -57,8 +57,11 @@ remove_sudo_login_keys() {
     authfile=$(echo "$key_data" | cut -d: -f2)
     key_hash=$(echo "$key_data" | cut -d: -f3)
     
-    # Remove from keymap file
-    sudo sed -i "/^$keyname:/d" "$KEYMAP_FILE"
+    # Remove from keymap file - find line by keyhash and delete by line number
+    line_number=$(grep -n ":$key_hash:" "$KEYMAP_FILE" | cut -d: -f1)
+    if [[ -n "$line_number" ]]; then
+      sudo sed -i "${line_number}d" "$KEYMAP_FILE"
+    fi
     
     # Remove from authfile (complex - remove specific key from user line)
     if [[ -f "$authfile" ]]; then
