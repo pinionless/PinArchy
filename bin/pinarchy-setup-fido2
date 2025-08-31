@@ -89,7 +89,9 @@ echo
 # Source component functions
 source "$(dirname "$0")/pinarchy-setup-fido2-sudo-login"
 source "$(dirname "$0")/pinarchy-setup-fido2-ssh"
+source "$(dirname "$0")/pinarchy-setup-fido2-luks"
 
 # Process selected components
 process_login_sudo_component
 process_ssh_component
+process_luks_component

@@ -1,0 +1,308 @@
+#!/bin/bash
+
+# FIDO2 LUKS component functions for PinArchy
+# This file is sourced by pinarchy-setup-fido2
+#
+# PURPOSE:
+# Handles FIDO2 LUKS disk encryption enrollment for hardware-backed disk decryption.
+# Uses systemd-cryptenroll to enroll FIDO2 devices with appropriate touch/PIN requirements.
+#
+# INTEGRATION:
+# - Sourced by main script: pinarchy-setup-fido2
+# - Inherits variables: SELECTED, OPTIONS, KEY_NAME (if set from login-sudo)
+# - Uses GUM for consistent UI with other Omarchy tools
+#
+# LUKS KEYMAP FILE: /etc/fido2/keymap-luks
+# Format: keyname:device_path:enrollment_id:timestamp:security_level
+# Example: work-yubikey:/dev/nvme0n1p2:7086a8ea9c:2025-08-28 18:30:03:no-touch
+# - keyname: User-provided friendly name for the key
+# - device_path: LUKS device path (e.g., /dev/sda2, /dev/nvme0n1p2)
+# - enrollment_id: systemd-cryptenroll enrollment token ID (truncated for readability)
+# - timestamp: Enrollment date and time
+# - security_level: no-touch, touch-required, pin-required, touch-pin-required
+#
+# SECURITY LEVELS MAPPING:
+# - no-touch: --fido2-with-user-presence=no
+# - touch-required: --fido2-with-user-presence=yes (default)
+# - pin-required: --fido2-with-user-verification=yes --fido2-with-user-presence=no
+# - touch-pin-required: --fido2-with-user-presence=yes --fido2-with-user-verification=yes
+#
+# IMPORTANT SECURITY CONSIDERATION:
+# Unlike login-sudo and SSH components, LUKS enrollment should typically use only ONE 
+# FIDO2 device per LUKS partition to avoid boot complexity. Recovery keys and password
+# fallback provide safer backup strategies than multiple hardware tokens.
+
+process_luks_component() {
+  # MAIN FUNCTION: Enroll FIDO2 device for LUKS disk encryption
+  # Processes LUKS component if selected in main script
+  # Handles device discovery, enrollment, and keymap tracking
+  
+  # Only process if luks component is selected
+  if [[ ! " ${SELECTED[@]} " =~ " luks " ]]; then
+    return 0
+  fi
+  echo "💾 Processing LUKS disk encryption..."
+  
+  # LUKS-SPECIFIC SECURITY RECOMMENDATION
+  echo ""
+  echo "⚠️  LUKS FIDO2 Key Recommendation:"
+  echo "   For disk encryption, it's recommended to enroll only ONE FIDO2 key"
+  echo "   per LUKS device to avoid boot process complexity."
+  echo "   Use recovery keys and password fallback for backup access."
+  echo ""
+  if ! gum confirm "Continue with LUKS FIDO2 setup?"; then
+    echo "❌ LUKS setup cancelled."
+    return 0
+  fi
+  
+  # DEVICE DISCOVERY: Find available LUKS devices on system
+  discover_luks_devices() {
+    echo "🔍 Discovering LUKS devices..."
+    
+    # Find all LUKS devices using lsblk
+    local luks_devices=()
+    while IFS= read -r line; do
+      if [[ -n "$line" ]]; then
+        luks_devices+=("$line")
+      fi
+    done < <(lsblk -rno NAME,FSTYPE | awk '$2=="crypto_LUKS" {print "/dev/" $1}' 2>/dev/null || true)
+    
+    if [[ ${#luks_devices[@]} -eq 0 ]]; then
+      echo "❌ No LUKS devices found on this system."
+      echo "   Make sure you have encrypted partitions set up first."
+      return 1
+    fi
+    
+    echo "✅ Found ${#luks_devices[@]} LUKS device(s):"
+    for device in "${luks_devices[@]}"; do
+      local uuid=$(lsblk -rno UUID "$device" 2>/dev/null || echo "unknown")
+      echo "   $device (UUID: ${uuid:0:8}...)"
+    done
+    
+    # Store devices for selection
+    LUKS_DEVICES=("${luks_devices[@]}")
+    return 0
+  }
+  
+  # Discover LUKS devices
+  if ! discover_luks_devices; then
+    return 1
+  fi
+  
+  # DEVICE SELECTION: Let user choose which LUKS device to enroll
+  echo
+  if [[ ${#LUKS_DEVICES[@]} -eq 1 ]]; then
+    SELECTED_DEVICE="${LUKS_DEVICES[0]}"
+    echo "📀 Using LUKS device: $SELECTED_DEVICE"
+  else
+    echo "📀 Select LUKS device to enroll:"
+    SELECTED_DEVICE=$(gum choose --header "Choose LUKS device for FIDO2 enrollment:" "${LUKS_DEVICES[@]}")
+    if [[ -z "$SELECTED_DEVICE" ]]; then
+      echo "❌ No device selected. Cancelling LUKS setup."
+      return 1
+    fi
+  fi
+  
+  # VALIDATE DEVICE: Ensure device is accessible and is LUKS
+  validate_luks_device() {
+    local device="$1"
+    
+    # Check if device exists
+    if [[ ! -b "$device" ]]; then
+      echo "❌ Device $device is not a block device or doesn't exist."
+      return 1
+    fi
+    
+    # Check if device is LUKS
+    if ! cryptsetup isLuks "$device" 2>/dev/null; then
+      echo "❌ Device $device is not a LUKS encrypted device."
+      return 1
+    fi
+    
+    # Check if systemd-cryptenroll is available
+    if ! command -v systemd-cryptenroll >/dev/null 2>&1; then
+      echo "❌ systemd-cryptenroll not found. Please install systemd package."
+      return 1
+    fi
+    
+    echo "✅ Device $device validated for FIDO2 enrollment."
+    return 0
+  }
+  
+  if ! validate_luks_device "$SELECTED_DEVICE"; then
+    return 1
+  fi
+  
+  # KEYNAME HANDLING: Reuse from login-sudo or ask user
+  if [[ -z "$KEY_NAME" ]]; then
+    echo
+    while [[ -z "$LUKS_KEY_NAME" ]]; do
+      LUKS_KEY_NAME=$(gum input --placeholder "Enter a name for this LUKS key (e.g. 'main-disk', 'backup-drive')" --prompt "LUKS key name (required): " || echo "")
+      if [[ -z "$LUKS_KEY_NAME" ]]; then
+        echo "❌ LUKS key name is required. Please provide a name for this key."
+      fi
+    done
+  else
+    # Reuse keyname from login-sudo setup
+    LUKS_KEY_NAME="$KEY_NAME"
+    echo "📋 Using keyname from previous setup: $LUKS_KEY_NAME"
+  fi
+  
+  # DETERMINE SECURITY LEVEL: Map authentication options to systemd-cryptenroll flags
+  determine_cryptenroll_options() {
+    local touch_required=false
+    local pin_required=false
+    local security_level=""
+    local cryptenroll_opts="--fido2-device=auto"
+    
+    # Check selected options
+    for option in "${OPTIONS[@]}"; do
+      case "$option" in
+        "touch-required") touch_required=true ;;
+        "pin-required") pin_required=true ;;
+      esac
+    done
+    
+    # Map options to systemd-cryptenroll flags and security level
+    if [[ "$touch_required" == false && "$pin_required" == false ]]; then
+      # No requirements - presence only
+      cryptenroll_opts="$cryptenroll_opts --fido2-with-user-presence=no"
+      security_level="no-touch"
+    elif [[ "$touch_required" == true && "$pin_required" == false ]]; then
+      # Touch required - default behavior
+      cryptenroll_opts="$cryptenroll_opts --fido2-with-user-presence=yes"
+      security_level="touch-required"
+    elif [[ "$touch_required" == false && "$pin_required" == true ]]; then
+      # PIN required - verification required but no touch
+      cryptenroll_opts="$cryptenroll_opts --fido2-with-user-verification=yes --fido2-with-user-presence=no"
+      security_level="pin-required"
+    elif [[ "$touch_required" == true && "$pin_required" == true ]]; then
+      # Both touch and PIN required
+      cryptenroll_opts="$cryptenroll_opts --fido2-with-user-presence=yes --fido2-with-user-verification=yes"
+      security_level="touch-pin-required"
+    fi
+    
+    # Export for use in other functions
+    CRYPTENROLL_OPTIONS="$cryptenroll_opts"
+    SECURITY_LEVEL="$security_level"
+  }
+  
+  determine_cryptenroll_options
+  echo "⚙️  Security level: $SECURITY_LEVEL"
+  echo "🔧 Cryptenroll options: $CRYPTENROLL_OPTIONS"
+  
+  # FIDO2 ENROLLMENT EXECUTION
+  echo
+  echo "🔐 Enrolling FIDO2 device for LUKS encryption..."
+  echo "During enrollment you must:"
+  echo "  • Enter the LUKS passphrase when prompted"
+  echo "  • Enter PIN on the security key"
+  echo "  • Touch the security key (if touch is required)"
+  echo "(Even if you selected no-touch authentication.)"
+  echo ""
+  
+  # Execute systemd-cryptenroll
+  echo "🔄 Running systemd-cryptenroll..."
+  if sudo systemd-cryptenroll $CRYPTENROLL_OPTIONS "$SELECTED_DEVICE" 2>/dev/null; then
+    echo "✅ FIDO2 enrollment successful for device: $SELECTED_DEVICE"
+    
+    # Get enrollment information for tracking
+    get_enrollment_info
+    
+    # Add to keymap tracking
+    add_luks_keymap_entry
+    
+    # Generate recovery key recommendation
+    recommend_recovery_key
+    
+  else
+    echo "❌ FIDO2 enrollment failed."
+    echo "Please check:"
+    echo "  • FIDO2 device is connected and unlocked"
+    echo "  • LUKS passphrase is correct"
+    echo "  • YubiKey firmware supports FIDO2 (5.2.3+)"
+    echo "  • PIN is set on device (if using PIN verification)"
+    return 1
+  fi
+}
+
+# FUNCTION: Get enrollment information for tracking
+get_enrollment_info() {
+  # Get the enrollment token ID from systemd-cryptenroll
+  # This is used for keymap tracking and future removal
+  local enrollment_output
+  enrollment_output=$(sudo systemd-cryptenroll --fido2-device=list "$SELECTED_DEVICE" 2>/dev/null | tail -1 || echo "")
+  
+  if [[ -n "$enrollment_output" ]]; then
+    # Extract enrollment ID and create hash for tracking
+    ENROLLMENT_ID=$(echo "$enrollment_output" | awk '{print $1}' | cut -c1-10)
+    if [[ -z "$ENROLLMENT_ID" ]]; then
+      ENROLLMENT_ID="unknown-$(date +%s | tail -c 6)"
+    fi
+  else
+    # Fallback ID if we can't get enrollment info
+    ENROLLMENT_ID="enrolled-$(date +%s | tail -c 6)"
+  fi
+  
+  echo "📋 Enrollment ID: $ENROLLMENT_ID"
+}
+
+# FUNCTION: Add LUKS keymap entry for tracking and removal
+add_luks_keymap_entry() {
+  local keymap_file="/etc/fido2/keymap-luks"
+  local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+  
+  # Create keymap file if it doesn't exist
+  if [[ ! -f "$keymap_file" ]]; then
+    sudo mkdir -p /etc/fido2
+    sudo tee "$keymap_file" >/dev/null << 'EOF'
+# FIDO2 LUKS Keys managed by PinArchy
+# DO NOT EDIT MANUALLY - Use pinarchy-setup-fido2 and pinarchy-remove-fido2
+# Format: keyname:device_path:enrollment_id:timestamp:security_level
+# Example: work-yubikey:/dev/nvme0n1p2:7086a8ea9c:2025-08-28 18:30:03:no-touch
+
+EOF
+    sudo chmod 600 "$keymap_file"
+  fi
+  
+  # Add keymap entry
+  local keymap_entry="$LUKS_KEY_NAME:$SELECTED_DEVICE:$ENROLLMENT_ID:$timestamp:$SECURITY_LEVEL"
+  echo "$keymap_entry" | sudo tee -a "$keymap_file" >/dev/null
+  
+  echo "📋 Added LUKS key tracking entry."
+}
+
+# FUNCTION: Recommend generating recovery key
+recommend_recovery_key() {
+  echo
+  echo "🔑 RECOVERY KEY RECOMMENDATION:"
+  echo "   It's highly recommended to generate a recovery key for this LUKS device."
+  echo "   This provides backup access if your FIDO2 device is lost or fails."
+  echo ""
+  
+  if gum confirm "Generate recovery key now?"; then
+    echo "🔄 Generating recovery key..."
+    
+    # Generate recovery key using systemd-cryptenroll
+    local recovery_output
+    if recovery_output=$(sudo systemd-cryptenroll --recovery-key "$SELECTED_DEVICE" 2>&1); then
+      echo "✅ Recovery key generated successfully!"
+      echo ""
+      echo "⚠️  IMPORTANT: Store this recovery key safely:"
+      echo "$recovery_output"
+      echo ""
+      echo "💾 Save this key in a secure location (password manager, safe, etc.)"
+      echo "🔒 You can use this key to unlock the device if FIDO2 fails"
+      
+      # Wait for user acknowledgment
+      echo ""
+      gum confirm "Have you safely stored the recovery key?" || echo "⚠️  Please store the recovery key before continuing"
+    else
+      echo "❌ Failed to generate recovery key:"
+      echo "$recovery_output"
+    fi
+  else
+    echo "⚠️  You can generate a recovery key later using:"
+    echo "   sudo systemd-cryptenroll --recovery-key $SELECTED_DEVICE"
+  fi
+}
