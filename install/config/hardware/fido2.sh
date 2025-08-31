@@ -26,6 +26,7 @@ sudo touch /etc/fido2/touch-required
 sudo touch /etc/fido2/pin-required
 sudo touch /etc/fido2/touch-pin-required
 sudo touch /etc/fido2/keymap
+sudo touch /etc/fido2/keymap-luks
 
 # Configure sudo PAM with four security levels
 # PAM tries each authfile in order with 'sufficient' - first match authenticates

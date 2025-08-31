@@ -81,7 +81,7 @@ Configure PAM modules for secure authentication:
 High
 
 ## Status
-Todo
+Done
 
 ## Preparation
 

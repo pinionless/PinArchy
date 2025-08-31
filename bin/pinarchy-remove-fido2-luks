@@ -1,0 +1,185 @@
+#!/bin/bash
+
+# FIDO2 LUKS removal component functions for PinArchy
+# This file is sourced by pinarchy-remove-fido2
+#
+# PURPOSE:
+# Handles removal of FIDO2 LUKS enrollments from encrypted devices.
+# Manages keymap-luks tracking and systemd-cryptenroll unenrollment.
+#
+# INTEGRATION:
+# - Sourced by main removal script: pinarchy-remove-fido2
+# - Uses LUKS keymap file: /etc/fido2/keymap-luks
+# - Provides: get_luks_keys() and remove_luks_keys() functions
+#
+# LUKS KEYMAP FORMAT: /etc/fido2/keymap-luks
+# keyname:device_path:enrollment_id:timestamp:security_level
+# Example: work-yubikey:/dev/nvme0n1p2:7086a8ea9c:2025-08-28 18:30:03:no-touch
+
+get_luks_keys() {
+  # FUNCTION: Parse LUKS keymap and populate arrays for key selection
+  # Populates global arrays: FILTERED_KEYS, DISPLAY_KEYS
+  # Used by main removal script for key selection interface
+  
+  local keymap_luks="/etc/fido2/keymap-luks"
+  FILTERED_KEYS=()
+  DISPLAY_KEYS=()
+  
+  # Check if LUKS keymap file exists
+  if [[ ! -f "$keymap_luks" ]]; then
+    return 0
+  fi
+  
+  # Parse keymap-luks file and filter for LUKS entries
+  while IFS= read -r line; do
+    # Skip empty lines and comments
+    [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+    
+    # Parse keymap line: keyname:device_path:enrollment_id:timestamp:security_level
+    local keyname device_path enrollment_id timestamp security_level
+    keyname=$(echo "$line" | cut -d: -f1)
+    device_path=$(echo "$line" | cut -d: -f2)
+    enrollment_id=$(echo "$line" | cut -d: -f3)
+    timestamp=$(echo "$line" | cut -d: -f4)
+    security_level=$(echo "$line" | cut -d: -f5)
+    
+    # Validate required fields
+    if [[ -n "$keyname" && -n "$device_path" && -n "$enrollment_id" ]]; then
+      # Add to filtered keys (raw data for processing)
+      FILTERED_KEYS+=("$line")
+      
+      # Create display entry with security icon
+      local security_icon=$(get_luks_security_icon "$security_level")
+      local device_short=$(basename "$device_path")
+      DISPLAY_KEYS+=("$keyname    [$device_short] $timestamp $security_icon")
+    fi
+  done < "$keymap_luks"
+}
+
+get_luks_security_icon() {
+  # FUNCTION: Get display icon for LUKS security level
+  # Used for consistent visual representation in removal interface
+  local security_level="$1"
+  
+  case "$security_level" in
+    "no-touch") echo "⚡" ;;
+    "touch-required") echo "👆" ;;
+    "pin-required") echo "🔢" ;;
+    "touch-pin-required") echo "👆🔢" ;;
+    *) echo "❓" ;;
+  esac
+}
+
+remove_luks_keys() {
+  # FUNCTION: Remove selected LUKS FIDO2 enrollments
+  # Args: Array of keymap entries to remove
+  # Removes systemd-cryptenroll enrollments and updates keymap-luks
+  
+  local selected_keys=("$@")
+  local keymap_luks="/etc/fido2/keymap-luks"
+  local temp_keymap="/tmp/keymap-luks.tmp"
+  
+  echo "🔄 Removing LUKS FIDO2 enrollments..."
+  
+  for key_data in "${selected_keys[@]}"; do
+    # Parse key data
+    local keyname device_path enrollment_id timestamp security_level
+    keyname=$(echo "$key_data" | cut -d: -f1)
+    device_path=$(echo "$key_data" | cut -d: -f2)
+    enrollment_id=$(echo "$key_data" | cut -d: -f3)
+    timestamp=$(echo "$key_data" | cut -d: -f4)
+    security_level=$(echo "$key_data" | cut -d: -f5)
+    
+    echo "  🗑️  Removing: $keyname from $device_path"
+    
+    # VALIDATE DEVICE: Ensure LUKS device still exists and is accessible
+    if [[ ! -b "$device_path" ]]; then
+      echo "  ⚠️   Device $device_path no longer exists - removing from keymap only"
+    elif ! cryptsetup isLuks "$device_path" 2>/dev/null; then
+      echo "  ⚠️   Device $device_path is no longer LUKS encrypted - removing from keymap only"
+    else
+      # ATTEMPT FIDO2 UNENROLLMENT: Try to remove FIDO2 enrollment from device
+      echo "  🔓 Attempting to remove FIDO2 enrollment from device..."
+      
+      # List current enrollments to find the right token
+      local enrollment_list
+      enrollment_list=$(sudo systemd-cryptenroll --fido2-device=list "$device_path" 2>/dev/null || echo "")
+      
+      if [[ -n "$enrollment_list" ]]; then
+        # Look for enrollment matching our stored ID (partial match)
+        local matching_token=""
+        while IFS= read -r enrollment_line; do
+          if [[ "$enrollment_line" == *"$enrollment_id"* ]]; then
+            matching_token=$(echo "$enrollment_line" | awk '{print $1}')
+            break
+          fi
+        done <<< "$enrollment_list"
+        
+        if [[ -n "$matching_token" ]]; then
+          # Attempt to wipe the specific FIDO2 enrollment
+          echo "  🔄 Removing FIDO2 token: $matching_token"
+          if sudo systemd-cryptenroll --wipe-slot="$matching_token" "$device_path" 2>/dev/null; then
+            echo "  ✅ FIDO2 enrollment removed from device"
+          else
+            echo "  ⚠️   Failed to remove FIDO2 enrollment from device (will remove from keymap anyway)"
+            echo "     You may need to remove it manually using:"
+            echo "     sudo systemd-cryptenroll --wipe-slot=$matching_token $device_path"
+          fi
+        else
+          echo "  ⚠️   Could not find matching FIDO2 enrollment on device"
+          echo "     Enrollment may have been removed already - removing from keymap"
+        fi
+      else
+        echo "  ⚠️   Could not list device enrollments - removing from keymap only"
+      fi
+    fi
+    
+    echo "  📋 Removing from keymap..."
+  done
+  
+  # KEYMAP UPDATE: Remove entries from keymap-luks file
+  # Create temporary file with entries that should be kept
+  if [[ -f "$keymap_luks" ]]; then
+    # Copy header comments and non-matching entries to temp file
+    while IFS= read -r line; do
+      local should_keep=true
+      
+      # Always keep comments and empty lines
+      if [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]]; then
+        echo "$line" >> "$temp_keymap"
+        continue
+      fi
+      
+      # Check if this line matches any of the keys to remove
+      for key_data in "${selected_keys[@]}"; do
+        if [[ "$line" == "$key_data" ]]; then
+          should_keep=false
+          break
+        fi
+      done
+      
+      # Keep line if it doesn't match any removal targets
+      if [[ "$should_keep" == true ]]; then
+        echo "$line" >> "$temp_keymap"
+      fi
+    done < "$keymap_luks"
+    
+    # Replace original file with filtered content
+    sudo mv "$temp_keymap" "$keymap_luks"
+    sudo chmod 600 "$keymap_luks"
+    
+    echo "📋 Updated keymap-luks file"
+  else
+    echo "⚠️  Keymap file not found - nothing to update"
+  fi
+  
+  echo
+  echo "🔒 IMPORTANT SECURITY NOTICE:"
+  echo "   FIDO2 enrollments have been removed, but:"
+  echo "   • LUKS passphrase authentication still works"
+  echo "   • Recovery keys (if generated) still work"
+  echo "   • Other authentication methods remain unchanged"
+  echo
+  echo "   If this was your only authentication method, ensure you have"
+  echo "   alternative access (passphrase/recovery key) before rebooting."
+}

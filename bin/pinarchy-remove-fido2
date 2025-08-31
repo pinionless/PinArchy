@@ -45,6 +45,7 @@ echo
 # Source component functions
 source "$(dirname "$0")/pinarchy-remove-fido2-sudo-login"
 source "$(dirname "$0")/pinarchy-remove-fido2-ssh"
+source "$(dirname "$0")/pinarchy-remove-fido2-luks"
 
 # Function to get keys for selected component
 get_component_keys() {
@@ -58,9 +59,7 @@ get_component_keys() {
       get_ssh_keys
       ;;
     "luks")
-      # LUKS component not implemented yet
-      FILTERED_KEYS=()
-      DISPLAY_KEYS=()
+      get_luks_keys
       ;;
     *)
       echo "Unknown component: $component"
@@ -124,6 +123,10 @@ for key_data in "${SELECTED_KEYS[@]}"; do
     # SSH format: keyname:key_type:security_level:timestamp
     security_level=$(echo "$key_data" | cut -d: -f3)
     security_icon=$(get_ssh_security_icon "$security_level")
+  elif [[ "$SELECTED_COMPONENT" == "luks" ]]; then
+    # LUKS format: keyname:device_path:enrollment_id:timestamp:security_level
+    security_level=$(echo "$key_data" | cut -d: -f5)
+    security_icon=$(get_luks_security_icon "$security_level")
   else
     security_icon=""
   fi
@@ -150,8 +153,7 @@ case "$SELECTED_COMPONENT" in
     remove_ssh_keys "${SELECTED_KEYS[@]}"
     ;;
   "luks")
-    echo "LUKS key removal not implemented yet."
-    exit 1
+    remove_luks_keys "${SELECTED_KEYS[@]}"
     ;;
   *)
     echo "Unknown component: $SELECTED_COMPONENT"
