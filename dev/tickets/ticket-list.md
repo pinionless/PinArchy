@@ -9,14 +9,17 @@ Completed tickets should be marked and moved to completed section.
 ## Active Tickets
 
 ### High Priority
-- 🟡 [TICKET-002](./TICKET-002-yubikey-authentication-system.md) - YubiKey Authentication System
+*(No active high priority tickets)*
 
 ### Medium Priority
+- 🔴 [TICKET-017](./TICKET-017-fido2-security-automation.md) - FIDO2 Security Automation
 
 ### Low Priority
 - 🔴 [TICKET-016](./TICKET-016-improve-starship-color-contrast.md) - Improve Starship Color Contrast
+- 🔴 [TICKET-018](./TICKET-018-tv-management-lg.md) - TV Management for LG TVs
 
 ## Completed Tickets
+- 🟢 [TICKET-002](./TICKET-002-yubikey-authentication-system.md) - YubiKey Authentication System
 - 🟢 [TICKET-014](./TICKET-014-starship-theme-integration.md) - Starship Theme Integration
 - 🟢 [TICKET-015](./TICKET-015-simple-archlinux-ascii-art-boot.md) - Simple ArchLinux ASCII Art for boot.sh (Replaced complex braille characters with simple "PinArchy" block ASCII art)
 - 🟢 [TICKET-012](./TICKET-012-replace-omarchy-branding-with-arch.md) - Replace Omarchy Branding with "PinArchy" (Waybar hover text changed from "Omarchy" to "Arch")
