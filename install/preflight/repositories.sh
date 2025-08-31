@@ -3,19 +3,8 @@
 # Install build tools
 sudo pacman -S --needed --noconfirm base-devel
 
-# Add fun and color and verbosity to the pacman installer
-if ! grep -q "ILoveCandy" /etc/pacman.conf; then
-  sudo sed -i '/^\[options\]/a Color\nILoveCandy\nVerbosePkgLists' /etc/pacman.conf
-fi
-
-# Add the Omarchy repository
-if ! grep -q "omarchy" /etc/pacman.conf; then
-  echo -e "\n[omarchy]\nSigLevel = Optional TrustAll\nServer = https://pkgs.omarchy.org/\$arch/\n" | sudo tee -a /etc/pacman.conf >/dev/null
-fi
-
-# Set mirrors to global ones only
-echo -e "Server = https://geo.mirror.pkgbuild.com/\$repo/os/\$arch\nServer = https://mirror.rackspace.com/archlinux/\$repo/os/\$arch" |
-  sudo tee /etc/pacman.d/mirrorlist >/dev/null
+# Configure pacman
+sudo cp -f ~/.local/share/omarchy/default/pacman/pacman.conf /etc/pacman.conf
 
 # Only add Chaotic-AUR if the architecture is x86_64 so ARM users can build the packages
 if [[ "$(uname -m)" == "x86_64" ]] && [ -z "$DISABLE_CHAOTIC" ]; then
@@ -26,12 +15,9 @@ if [[ "$(uname -m)" == "x86_64" ]] && [ -z "$DISABLE_CHAOTIC" ]; then
     sudo pacman -U --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' &&
     sudo pacman -U --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst'; then
 
-    # Add Chaotic-AUR repo to pacman config
-    if ! grep -q "chaotic-aur" /etc/pacman.conf; then
-      echo -e '\n[chaotic-aur]\nInclude = /etc/pacman.d/chaotic-mirrorlist' | sudo tee -a /etc/pacman.conf >/dev/null
-    fi
+    echo "Chaotic-AUR keyring and mirrorlist installed successfully"
   else
-    echo -e "Failed to install Chaotic-AUR, so won't include it in pacman config!"
+    echo -e "Failed to install Chaotic-AUR keyring/mirrorlist, so won't be available!"
   fi
 fi
 
