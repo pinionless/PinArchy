@@ -14,6 +14,7 @@ Completed tickets should be marked and moved to completed section.
 ### Medium Priority
 - 🔴 [TICKET-017](./TICKET-017-fido2-security-automation.md) - FIDO2 Security Automation
 - 🔴 [TICKET-019](./TICKET-019-limine-multi-boot-menu.md) - Limine Multi-Boot Menu Integration
+- 🔴 [TICKET-020](./TICKET-020-hibernation-swapfile-subvolume.md) - Hibernation with Swapfile in Subvolume
 
 ### Low Priority
 - 🔴 [TICKET-016](./TICKET-016-improve-starship-color-contrast.md) - Improve Starship Color Contrast
