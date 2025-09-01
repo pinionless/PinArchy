@@ -13,11 +13,11 @@
 # - Uses GUM for consistent UI with other Omarchy tools
 #
 # LUKS KEYMAP FILE: /etc/fido2/keymap-luks
-# Format: keyname:device_path:enrollment_id:timestamp:security_level
-# Example: work-yubikey:/dev/nvme0n1p2:7086a8ea9c:2025-08-28 18:30:03:no-touch
+# Format: keyname:device_path:credential_hash:timestamp:security_level
+# Example: work-yubikey:/dev/nvme0n1p2:c4a7e8b2f1:2025-08-28 18:30:03:no-touch
 # - keyname: User-provided friendly name for the key
 # - device_path: LUKS device path (e.g., /dev/sda2, /dev/nvme0n1p2)
-# - enrollment_id: systemd-cryptenroll enrollment token ID (truncated for readability)
+# - credential_hash: First 10 chars of sha256(fido2-credential) for unique identification
 # - timestamp: Enrollment date and time
 # - security_level: no-touch, touch-required, pin-required, touch-pin-required
 #
@@ -114,7 +114,7 @@ process_luks_component() {
     fi
     
     # Check if device is LUKS
-    if ! cryptsetup isLuks "$device" 2>/dev/null; then
+    if ! sudo cryptsetup isLuks "$device" 2>/dev/null; then
       echo "❌ Device $device is not a LUKS encrypted device."
       return 1
     fi
@@ -166,19 +166,19 @@ process_luks_component() {
     # Map options to systemd-cryptenroll flags and security level
     if [[ "$touch_required" == false && "$pin_required" == false ]]; then
       # No requirements - presence only
-      cryptenroll_opts="$cryptenroll_opts --fido2-with-user-presence=no"
+      cryptenroll_opts="$cryptenroll_opts --fido2-with-user-presence=no --fido2-with-user-verification=no --fido2-with-client-pin=no"
       security_level="no-touch"
     elif [[ "$touch_required" == true && "$pin_required" == false ]]; then
       # Touch required - default behavior
-      cryptenroll_opts="$cryptenroll_opts --fido2-with-user-presence=yes"
+      cryptenroll_opts="$cryptenroll_opts --fido2-with-user-presence=yes --fido2-with-user-verification=no --fido2-with-client-pin=no"
       security_level="touch-required"
     elif [[ "$touch_required" == false && "$pin_required" == true ]]; then
       # PIN required - verification required but no touch
-      cryptenroll_opts="$cryptenroll_opts --fido2-with-user-verification=yes --fido2-with-user-presence=no"
+      cryptenroll_opts="$cryptenroll_opts --fido2-with-user-verification=yes --fido2-with-user-presence=no --fido2-with-client-pin=yes"
       security_level="pin-required"
     elif [[ "$touch_required" == true && "$pin_required" == true ]]; then
       # Both touch and PIN required
-      cryptenroll_opts="$cryptenroll_opts --fido2-with-user-presence=yes --fido2-with-user-verification=yes"
+      cryptenroll_opts="$cryptenroll_opts --fido2-with-user-presence=yes --fido2-with-user-verification=yes --fido2-with-client-pin=yes"
       security_level="touch-pin-required"
     fi
     
@@ -190,6 +190,10 @@ process_luks_component() {
   determine_cryptenroll_options
   echo "⚙️  Security level: $SECURITY_LEVEL"
   echo "🔧 Cryptenroll options: $CRYPTENROLL_OPTIONS"
+  
+  # PRE-ENROLLMENT CREDENTIAL CAPTURE
+  echo "📋 Capturing existing FIDO2 credentials for tracking..."
+  capture_pre_enrollment_hashes
   
   # FIDO2 ENROLLMENT EXECUTION
   echo
@@ -226,25 +230,82 @@ process_luks_component() {
   fi
 }
 
-# FUNCTION: Get enrollment information for tracking
-get_enrollment_info() {
-  # Get the enrollment token ID from systemd-cryptenroll
-  # This is used for keymap tracking and future removal
-  local enrollment_output
-  enrollment_output=$(sudo systemd-cryptenroll --fido2-device=list "$SELECTED_DEVICE" 2>/dev/null | tail -1 || echo "")
+# FUNCTION: Capture existing FIDO2 credential hashes before enrollment
+capture_pre_enrollment_hashes() {
+  # Captures all existing fido2-credential hashes before enrollment
+  # This allows us to identify the newly added credential after enrollment
+  PRE_ENROLLMENT_HASHES=()
   
-  if [[ -n "$enrollment_output" ]]; then
-    # Extract enrollment ID and create hash for tracking
-    ENROLLMENT_ID=$(echo "$enrollment_output" | awk '{print $1}' | cut -c1-10)
-    if [[ -z "$ENROLLMENT_ID" ]]; then
-      ENROLLMENT_ID="unknown-$(date +%s | tail -c 6)"
-    fi
+  local luks_dump
+  luks_dump=$(sudo cryptsetup luksDump "$SELECTED_DEVICE" 2>/dev/null)
+  
+  if [[ -n "$luks_dump" ]]; then
+    # Extract all existing fido2-credential values and hash them
+    while IFS= read -r credential_line; do
+      if [[ "$credential_line" =~ ^[[:space:]]*([0-9a-f]{2}[[:space:]]+)+ ]]; then
+        # Remove spaces and convert to single hex string
+        local hex_string=$(echo "$credential_line" | tr -d ' \t')
+        if [[ ${#hex_string} -gt 0 ]]; then
+          # Generate sha256 hash and take first 10 chars
+          local credential_hash=$(echo -n "$hex_string" | sha256sum | cut -c1-10)
+          PRE_ENROLLMENT_HASHES+=("$credential_hash")
+        fi
+      fi
+    done < <(echo "$luks_dump" | sed -n '/fido2-credential:/,/fido2-salt:/p' | grep -E '^[[:space:]]*[0-9a-f]')
+    
+    echo "📋 Found ${#PRE_ENROLLMENT_HASHES[@]} existing FIDO2 credential(s)"
   else
-    # Fallback ID if we can't get enrollment info
-    ENROLLMENT_ID="enrolled-$(date +%s | tail -c 6)"
+    echo "📋 No existing LUKS dump available - assuming first enrollment"
   fi
+}
+
+# FUNCTION: Get enrollment information for tracking using credential hash
+get_enrollment_info() {
+  # Generate unique identifier by hashing fido2-credential from LUKS dump
+  # This creates a stable, unique identifier for removal purposes
+  local luks_dump
+  luks_dump=$(sudo cryptsetup luksDump "$SELECTED_DEVICE" 2>/dev/null)
   
-  echo "📋 Enrollment ID: $ENROLLMENT_ID"
+  if [[ -n "$luks_dump" ]]; then
+    # Extract all fido2-credential values and hash them
+    local credential_hashes=()
+    while IFS= read -r credential_line; do
+      if [[ "$credential_line" =~ ^[[:space:]]*([0-9a-f]{2}[[:space:]]+)+ ]]; then
+        # Remove spaces and convert to single hex string
+        local hex_string=$(echo "$credential_line" | tr -d ' \t')
+        if [[ ${#hex_string} -gt 0 ]]; then
+          # Generate sha256 hash and take first 10 chars
+          local credential_hash=$(echo -n "$hex_string" | sha256sum | cut -c1-10)
+          credential_hashes+=("$credential_hash")
+        fi
+      fi
+    done < <(echo "$luks_dump" | sed -n '/fido2-credential:/,/fido2-salt:/p' | grep -E '^[[:space:]]*[0-9a-f]')
+    
+    # Find the newest hash by comparing with PRE_ENROLLMENT_HASHES
+    for hash in "${credential_hashes[@]}"; do
+      local found_in_pre=false
+      for pre_hash in "${PRE_ENROLLMENT_HASHES[@]}"; do
+        if [[ "$hash" == "$pre_hash" ]]; then
+          found_in_pre=true
+          break
+        fi
+      done
+      
+      if [[ "$found_in_pre" == false ]]; then
+        ENROLLMENT_ID="$hash"
+        echo "📋 New credential hash: $ENROLLMENT_ID"
+        return 0
+      fi
+    done
+    
+    # Fallback if we can't find the new hash
+    ENROLLMENT_ID="fallback-$(date +%s | tail -c 6)"
+    echo "⚠️  Could not identify new credential, using fallback ID: $ENROLLMENT_ID"
+  else
+    # Fallback ID if we can't get LUKS dump
+    ENROLLMENT_ID="unknown-$(date +%s | tail -c 6)"
+    echo "⚠️  Could not read LUKS dump, using fallback ID: $ENROLLMENT_ID"
+  fi
 }
 
 # FUNCTION: Add LUKS keymap entry for tracking and removal
@@ -258,11 +319,10 @@ add_luks_keymap_entry() {
     sudo tee "$keymap_file" >/dev/null << 'EOF'
 # FIDO2 LUKS Keys managed by PinArchy
 # DO NOT EDIT MANUALLY - Use pinarchy-setup-fido2 and pinarchy-remove-fido2
-# Format: keyname:device_path:enrollment_id:timestamp:security_level
-# Example: work-yubikey:/dev/nvme0n1p2:7086a8ea9c:2025-08-28 18:30:03:no-touch
+# Format: keyname:device_path:credential_hash:timestamp:security_level
+# Example: work-yubikey:/dev/nvme0n1p2:c4a7e8b2f1:2025-08-28 18:30:03:no-touch
 
 EOF
-    sudo chmod 600 "$keymap_file"
   fi
   
   # Add keymap entry

@@ -8,21 +8,6 @@ set -e
 echo "🗑️  PinArchy FIDO2 Key Removal"
 echo
 
-# Check if keymap file exists
-KEYMAP_FILE="/etc/fido2/keymap"
-if [[ ! -f "$KEYMAP_FILE" ]]; then
-  echo "❌ No FIDO2 keys found. Keymap file does not exist."
-  echo "Use pinarchy-setup-fido2 to register keys first."
-  exit 1
-fi
-
-# Check if keymap file has content
-if [[ ! -s "$KEYMAP_FILE" ]]; then
-  echo "❌ No FIDO2 keys registered."
-  echo "Use pinarchy-setup-fido2 to register keys first."
-  exit 1
-fi
-
 # Define available FIDO2 components (single select only)
 COMPONENTS=(
   "sudo-login"

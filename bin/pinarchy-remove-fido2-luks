@@ -13,8 +13,8 @@
 # - Provides: get_luks_keys() and remove_luks_keys() functions
 #
 # LUKS KEYMAP FORMAT: /etc/fido2/keymap-luks
-# keyname:device_path:enrollment_id:timestamp:security_level
-# Example: work-yubikey:/dev/nvme0n1p2:7086a8ea9c:2025-08-28 18:30:03:no-touch
+# keyname:device_path:credential_hash:timestamp:security_level
+# Example: work-yubikey:/dev/nvme0n1p2:c4a7e8b2f1:2025-08-28 18:30:03:no-touch
 
 get_luks_keys() {
   # FUNCTION: Parse LUKS keymap and populate arrays for key selection
@@ -35,16 +35,17 @@ get_luks_keys() {
     # Skip empty lines and comments
     [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
     
-    # Parse keymap line: keyname:device_path:enrollment_id:timestamp:security_level
-    local keyname device_path enrollment_id timestamp security_level
+    # Parse keymap line: keyname:device_path:credential_hash:timestamp:security_level
+    # Note: timestamp contains colons (YYYY-MM-DD HH:MM:SS), so we reconstruct it
+    local keyname device_path credential_hash timestamp security_level
     keyname=$(echo "$line" | cut -d: -f1)
     device_path=$(echo "$line" | cut -d: -f2)
-    enrollment_id=$(echo "$line" | cut -d: -f3)
-    timestamp=$(echo "$line" | cut -d: -f4)
-    security_level=$(echo "$line" | cut -d: -f5)
+    credential_hash=$(echo "$line" | cut -d: -f3)
+    timestamp=$(echo "$line" | cut -d: -f4-6)  # Reconstruct: "2025-08-31 21:30:23"
+    security_level=$(echo "$line" | cut -d: -f7)
     
     # Validate required fields
-    if [[ -n "$keyname" && -n "$device_path" && -n "$enrollment_id" ]]; then
+    if [[ -n "$keyname" && -n "$device_path" && -n "$credential_hash" ]]; then
       # Add to filtered keys (raw data for processing)
       FILTERED_KEYS+=("$line")
       
@@ -62,7 +63,7 @@ get_luks_security_icon() {
   local security_level="$1"
   
   case "$security_level" in
-    "no-touch") echo "⚡" ;;
+    "no-touch") echo "" ;;
     "touch-required") echo "👆" ;;
     "pin-required") echo "🔢" ;;
     "touch-pin-required") echo "👆🔢" ;;
@@ -82,55 +83,84 @@ remove_luks_keys() {
   echo "🔄 Removing LUKS FIDO2 enrollments..."
   
   for key_data in "${selected_keys[@]}"; do
-    # Parse key data
-    local keyname device_path enrollment_id timestamp security_level
+    # Parse key data - note timestamp has colons so we need to reconstruct it
+    local keyname device_path credential_hash timestamp security_level
     keyname=$(echo "$key_data" | cut -d: -f1)
     device_path=$(echo "$key_data" | cut -d: -f2)
-    enrollment_id=$(echo "$key_data" | cut -d: -f3)
-    timestamp=$(echo "$key_data" | cut -d: -f4)
-    security_level=$(echo "$key_data" | cut -d: -f5)
+    credential_hash=$(echo "$key_data" | cut -d: -f3)
+    timestamp=$(echo "$key_data" | cut -d: -f4-6)
+    security_level=$(echo "$key_data" | cut -d: -f7)
     
     echo "  🗑️  Removing: $keyname from $device_path"
     
     # VALIDATE DEVICE: Ensure LUKS device still exists and is accessible
     if [[ ! -b "$device_path" ]]; then
       echo "  ⚠️   Device $device_path no longer exists - removing from keymap only"
-    elif ! cryptsetup isLuks "$device_path" 2>/dev/null; then
+    elif ! sudo cryptsetup isLuks "$device_path" 2>/dev/null; then
       echo "  ⚠️   Device $device_path is no longer LUKS encrypted - removing from keymap only"
     else
-      # ATTEMPT FIDO2 UNENROLLMENT: Try to remove FIDO2 enrollment from device
+      # ATTEMPT FIDO2 UNENROLLMENT: Match by credential hash and remove
       echo "  🔓 Attempting to remove FIDO2 enrollment from device..."
       
-      # List current enrollments to find the right token
-      local enrollment_list
-      enrollment_list=$(sudo systemd-cryptenroll --fido2-device=list "$device_path" 2>/dev/null || echo "")
+      # Get current LUKS dump to find matching credential
+      local luks_dump
+      luks_dump=$(sudo cryptsetup luksDump "$device_path" 2>/dev/null)
       
-      if [[ -n "$enrollment_list" ]]; then
-        # Look for enrollment matching our stored ID (partial match)
-        local matching_token=""
-        while IFS= read -r enrollment_line; do
-          if [[ "$enrollment_line" == *"$enrollment_id"* ]]; then
-            matching_token=$(echo "$enrollment_line" | awk '{print $1}')
-            break
-          fi
-        done <<< "$enrollment_list"
+      if [[ -n "$luks_dump" ]]; then
+        # Find token ID with matching credential hash
+        local matching_token_id=""
+        local current_token_id=""
+        local in_credential_section=false
         
-        if [[ -n "$matching_token" ]]; then
-          # Attempt to wipe the specific FIDO2 enrollment
-          echo "  🔄 Removing FIDO2 token: $matching_token"
-          if sudo systemd-cryptenroll --wipe-slot="$matching_token" "$device_path" 2>/dev/null; then
+        while IFS= read -r dump_line; do
+          # Track current token ID
+          if [[ "$dump_line" =~ ^[[:space:]]*([0-9]+):[[:space:]]*systemd-fido2 ]]; then
+            current_token_id="${BASH_REMATCH[1]}"
+            in_credential_section=false
+          fi
+          
+          # Enter credential section for current token
+          if [[ "$dump_line" =~ ^[[:space:]]*fido2-credential: ]]; then
+            in_credential_section=true
+            continue
+          fi
+          
+          # Exit credential section when we hit next field
+          if [[ "$in_credential_section" == true ]] && [[ "$dump_line" =~ ^[[:space:]]*fido2-(salt|rp|clientPin|up|uv): ]]; then
+            in_credential_section=false
+          fi
+          
+          # Process credential hex lines
+          if [[ "$in_credential_section" == true ]] && [[ "$dump_line" =~ ^[[:space:]]*([0-9a-f]{2}[[:space:]]+)+ ]]; then
+            # Remove spaces and convert to single hex string
+            local hex_string=$(echo "$dump_line" | tr -d ' \t')
+            if [[ ${#hex_string} -gt 0 ]]; then
+              # Generate sha256 hash and take first 10 chars
+              local dump_credential_hash=$(echo -n "$hex_string" | sha256sum | cut -c1-10)
+              if [[ "$dump_credential_hash" == "$credential_hash" ]]; then
+                matching_token_id="$current_token_id"
+                break
+              fi
+            fi
+          fi
+        done <<< "$luks_dump"
+        
+        if [[ -n "$matching_token_id" ]]; then
+          # Attempt to wipe the specific FIDO2 token
+          echo "  🔄 Removing FIDO2 token: $matching_token_id (credential hash: $credential_hash)"
+          if sudo systemd-cryptenroll --wipe-slot="$matching_token_id" "$device_path" 2>/dev/null; then
             echo "  ✅ FIDO2 enrollment removed from device"
           else
             echo "  ⚠️   Failed to remove FIDO2 enrollment from device (will remove from keymap anyway)"
             echo "     You may need to remove it manually using:"
-            echo "     sudo systemd-cryptenroll --wipe-slot=$matching_token $device_path"
+            echo "     sudo systemd-cryptenroll --wipe-slot=$matching_token_id $device_path"
           fi
         else
-          echo "  ⚠️   Could not find matching FIDO2 enrollment on device"
-          echo "     Enrollment may have been removed already - removing from keymap"
+          echo "  ⚠️   Could not find FIDO2 token with matching credential hash: $credential_hash"
+          echo "     Token may have been removed already - removing from keymap"
         fi
       else
-        echo "  ⚠️   Could not list device enrollments - removing from keymap only"
+        echo "  ⚠️   Could not read LUKS dump - removing from keymap only"
       fi
     fi
     
