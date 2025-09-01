@@ -1,32 +1,40 @@
 #!/bin/bash
 
-# FIDO2 sudo-login component removal functions for PinArchy
+# FIDO2 sudo component removal functions for PinArchy
 # This file is sourced by pinarchy-remove-fido2
 
-# Function to get security icon based on authfile path
+# Function to get security icon based on sudo authfile path
 get_security_icon() {
   local authfile="$1"
   case "$authfile" in
-    "/etc/fido2/no-touch") echo "" ;;  # No icon for no requirements
-    "/etc/fido2/touch-required") echo "👆" ;;
-    "/etc/fido2/pin-required") echo "🔢" ;;
-    "/etc/fido2/touch-pin-required") echo "👆🔢" ;;
+    "/etc/fido2/sudo-no-touch") echo "" ;;  # No icon for no requirements
+    "/etc/fido2/sudo-touch-required") echo "👆" ;;
+    "/etc/fido2/sudo-pin-required") echo "🔢" ;;
+    "/etc/fido2/sudo-touch-pin-required") echo "👆🔢" ;;
     *) echo "❓" ;;  # Unknown authfile
   esac
 }
 
-# Function to get sudo-login keys from keymap
-get_sudo_login_keys() {
+# Function to get sudo keys from keymap-sudo
+get_sudo_keys() {
   local keys=()
   local display_keys=()
+  local keymap_file="/etc/fido2/keymap-sudo"
   
-  # Read keymap and filter for sudo-login keys
+  # Check if keymap file exists
+  if [[ ! -f "$keymap_file" ]]; then
+    FILTERED_KEYS=()
+    DISPLAY_KEYS=()
+    return 0
+  fi
+  
+  # Read keymap and filter for sudo keys
   while IFS=: read -r keyname authfile key_hash timestamp; do
-    # Skip empty lines
-    [[ -z "$keyname" ]] && continue
+    # Skip empty lines and comments
+    [[ -z "$keyname" || "$keyname" =~ ^[[:space:]]*# ]] && continue
     
-    # Filter for sudo-login keys (in /etc/fido2/* authfiles)
-    if [[ "$authfile" =~ ^/etc/fido2/(no-touch|touch-required|pin-required|touch-pin-required)$ ]]; then
+    # Filter for sudo keys (in /etc/fido2/sudo-* authfiles)
+    if [[ "$authfile" =~ ^/etc/fido2/sudo-(no-touch|touch-required|pin-required|touch-pin-required)$ ]]; then
       keys+=("$keyname:$authfile:$key_hash:$timestamp")
       
       # Format for display: keyname + date + icon
@@ -38,18 +46,19 @@ get_sudo_login_keys() {
       
       display_keys+=("$display_text")
     fi
-  done < "$KEYMAP_FILE"
+  done < "$keymap_file"
   
   # Return both arrays via global variables
   FILTERED_KEYS=("${keys[@]}")
   DISPLAY_KEYS=("${display_keys[@]}")
 }
 
-# Function to remove sudo-login keys
-remove_sudo_login_keys() {
+# Function to remove sudo keys
+remove_sudo_keys() {
   local selected_keys=("$@")
+  local keymap_file="/etc/fido2/keymap-sudo"
   
-  echo "🗑️  Removing selected keys..."
+  echo "🗑️  Removing selected sudo keys..."
   
   # Remove keys from authfiles and keymap
   for key_data in "${selected_keys[@]}"; do
@@ -58,9 +67,11 @@ remove_sudo_login_keys() {
     key_hash=$(echo "$key_data" | cut -d: -f3)
     
     # Remove from keymap file - find line by keyhash and delete by line number
-    line_number=$(grep -n ":$key_hash:" "$KEYMAP_FILE" | cut -d: -f1)
-    if [[ -n "$line_number" ]]; then
-      sudo sed -i "${line_number}d" "$KEYMAP_FILE"
+    if [[ -f "$keymap_file" ]]; then
+      line_number=$(grep -n ":$key_hash:" "$keymap_file" | cut -d: -f1)
+      if [[ -n "$line_number" ]]; then
+        sudo sed -i "${line_number}d" "$keymap_file"
+      fi
     fi
     
     # Remove from authfile (complex - remove specific key from user line)

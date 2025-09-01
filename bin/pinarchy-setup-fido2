@@ -23,7 +23,8 @@ check_fido2_hardware() {
 
 # Define available FIDO2 components
 COMPONENTS=(
-  "login-sudo"
+  "sudo"
+  "login"
   "ssh"
   "luks"
 )
@@ -58,8 +59,9 @@ echo
 echo "Selected components:"
 for component in "${SELECTED[@]}"; do
   case "$component" in
-    "login-sudo") echo "  🔐 login-sudo - System authentication (login + sudo + GUI admin)" ;;
-    "ssh") echo "  🔑 ssh - Hardware-backed SSH keys" ;;
+    "sudo") echo "  🔐 sudo - Administrative authentication (sudo + GUI admin)" ;;
+    "login") echo "  🔑 login - Console/system login authentication" ;;
+    "ssh") echo "  🔗 ssh - Hardware-backed SSH keys" ;;
     "luks") echo "  💾 luks - Disk encryption with FIDO2" ;;
   esac
 done
@@ -87,11 +89,13 @@ fi
 echo
 
 # Source component functions
-source "$(dirname "$0")/pinarchy-setup-fido2-sudo-login"
+source "$(dirname "$0")/pinarchy-setup-fido2-sudo"
+source "$(dirname "$0")/pinarchy-setup-fido2-login"
 source "$(dirname "$0")/pinarchy-setup-fido2-ssh"
 source "$(dirname "$0")/pinarchy-setup-fido2-luks"
 
 # Process selected components
-process_login_sudo_component
+process_sudo_component
+process_login_component
 process_ssh_component
 process_luks_component

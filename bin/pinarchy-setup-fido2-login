@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# FIDO2 login-sudo component functions for PinArchy
+# FIDO2 login component functions for PinArchy
 # This file is sourced by pinarchy-setup-fido2
 #
 # PURPOSE:
-# Handles FIDO2 key registration for system authentication (login + sudo + polkit GUI admin).
+# Handles FIDO2 key registration for console/system login authentication.
 # Supports four security levels with different touch/PIN requirements.
 #
 # INTEGRATION:
@@ -12,19 +12,19 @@
 # - Inherits variables: SELECTED, OPTIONS, HOSTNAME
 # - Uses GUM for consistent UI with other Omarchy tools
 #
-# KEYMAP FILE FORMAT: /etc/fido2/keymap
+# KEYMAP FILE FORMAT: /etc/fido2/keymap-login
 # Each line: keyname:authfile:key_hash:timestamp
-# Example: work-yubikey:/etc/fido2/touch-required:7086a8ea9c:2025-08-28 18:30:03
+# Example: work-yubikey:/etc/fido2/login-touch-required:7086a8ea9c:2025-08-28 18:30:03
 # - keyname: User-provided friendly name for the key
 # - authfile: Full path to the security level authfile
 # - key_hash: SHA256 hash of key handle (first 10 chars for identification)
 # - timestamp: Registration date and time
 #
-# AUTHFILE SYSTEM: Four security levels
-# - /etc/fido2/no-touch: Presence only (no touch, no PIN required)
-# - /etc/fido2/touch-required: Physical touch required (default FIDO2 behavior)
-# - /etc/fido2/pin-required: PIN entry required (no touch)
-# - /etc/fido2/touch-pin-required: Both touch AND PIN required (highest security)
+# AUTHFILE SYSTEM: Four login-specific security levels
+# - /etc/fido2/login-no-touch: Presence only (no touch, no PIN required)
+# - /etc/fido2/login-touch-required: Physical touch required (default FIDO2 behavior)
+# - /etc/fido2/login-pin-required: PIN entry required (no touch)
+# - /etc/fido2/login-touch-pin-required: Both touch AND PIN required (highest security)
 #
 # AUTHFILE FORMAT (PAM pam_u2f compatible):
 # username:key1:key2:key3...
@@ -39,16 +39,16 @@
 # 5. Key metadata stored in keymap for management/removal
 # 6. FIDO2 privacy-by-design: Each registration creates unique key handle
 
-process_login_sudo_component() {
-  # MAIN FUNCTION: Register FIDO2 key for login/sudo authentication
-  # Processes login-sudo component if selected in main script
+process_login_component() {
+  # MAIN FUNCTION: Register FIDO2 key for login authentication
+  # Processes login component if selected in main script
   # Handles user interaction, key registration, and keymap tracking
   
-  # Only process if login-sudo component is selected
-  if [[ ! " ${SELECTED[@]} " =~ " login-sudo " ]]; then
+  # Only process if login component is selected
+  if [[ ! " ${SELECTED[@]} " =~ " login " ]]; then
     return 0
   fi
-  echo "🔐 Processing login-sudo authentication..."
+  echo "🔑 Processing login authentication..."
   
   # FUNCTION: Map user authentication selections to appropriate authfile
   # Maps touch/PIN options to one of four security level authfiles
@@ -65,15 +65,15 @@ process_login_sudo_component() {
       esac
     done
     
-    # Map options to authfile paths
+    # Map options to login-specific authfile paths
     if [[ "$touch_required" == true && "$pin_required" == true ]]; then
-      echo "/etc/fido2/touch-pin-required"
+      echo "/etc/fido2/login-touch-pin-required"
     elif [[ "$touch_required" == true ]]; then
-      echo "/etc/fido2/touch-required"
+      echo "/etc/fido2/login-touch-required"
     elif [[ "$pin_required" == true ]]; then
-      echo "/etc/fido2/pin-required"
+      echo "/etc/fido2/login-pin-required"
     else
-      echo "/etc/fido2/no-touch"
+      echo "/etc/fido2/login-no-touch"
     fi
   }
   
@@ -113,16 +113,16 @@ process_login_sudo_component() {
   # Additional flags added based on target authfile security level
   PAMU2F_FLAGS="-o pam://$MYHOSTNAME -i pam://$MYHOSTNAME"
   case "$AUTHFILE" in
-    "/etc/fido2/no-touch")
+    "/etc/fido2/login-no-touch")
       PAMU2F_FLAGS="$PAMU2F_FLAGS --no-user-presence"
       ;;
-    "/etc/fido2/touch-required")
+    "/etc/fido2/login-touch-required")
       # Default behavior - no additional flags needed
       ;;
-    "/etc/fido2/pin-required")
+    "/etc/fido2/login-pin-required")
       PAMU2F_FLAGS="$PAMU2F_FLAGS --no-user-presence --pin-verification"
       ;;
-    "/etc/fido2/touch-pin-required")
+    "/etc/fido2/login-touch-pin-required")
       PAMU2F_FLAGS="$PAMU2F_FLAGS --pin-verification"
       ;;
   esac
@@ -156,7 +156,7 @@ process_login_sudo_component() {
       # Store key metadata for management and removal operations
       # Format: keyname:authfile:key_hash:timestamp
       TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
-      KEYMAP_FILE="/etc/fido2/keymap"
+      KEYMAP_FILE="/etc/fido2/keymap-login"
       
       # KEY IDENTIFICATION: Extract key handle and generate hash for tracking
       # Key handle is first component before comma in key data

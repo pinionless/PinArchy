@@ -1,0 +1,187 @@
+#!/bin/bash
+
+# FIDO2 sudo component functions for PinArchy
+# This file is sourced by pinarchy-setup-fido2
+#
+# PURPOSE:
+# Handles FIDO2 key registration for sudo authentication (sudo + polkit GUI admin).
+# Supports four security levels with different touch/PIN requirements.
+#
+# INTEGRATION:
+# - Sourced by main script: pinarchy-setup-fido2
+# - Inherits variables: SELECTED, OPTIONS, HOSTNAME
+# - Uses GUM for consistent UI with other Omarchy tools
+#
+# KEYMAP FILE FORMAT: /etc/fido2/keymap-sudo
+# Each line: keyname:authfile:key_hash:timestamp
+# Example: work-yubikey:/etc/fido2/sudo-touch-required:7086a8ea9c:2025-08-28 18:30:03
+# - keyname: User-provided friendly name for the key
+# - authfile: Full path to the security level authfile
+# - key_hash: SHA256 hash of key handle (first 10 chars for identification)
+# - timestamp: Registration date and time
+#
+# AUTHFILE SYSTEM: Four sudo-specific security levels
+# - /etc/fido2/sudo-no-touch: Presence only (no touch, no PIN required)
+# - /etc/fido2/sudo-touch-required: Physical touch required (default FIDO2 behavior)
+# - /etc/fido2/sudo-pin-required: PIN entry required (no touch)
+# - /etc/fido2/sudo-touch-pin-required: Both touch AND PIN required (highest security)
+#
+# AUTHFILE FORMAT (PAM pam_u2f compatible):
+# username:key1:key2:key3...
+# Multiple keys for same user are colon-separated on same line (NOT separate lines)
+# Example: alice:KeyHandle1,UserKey1:KeyHandle2,UserKey2
+#
+# KEY REGISTRATION PROCESS:
+# 1. User selects authentication options (touch/PIN requirements)
+# 2. determine_authfile() maps selections to appropriate authfile path
+# 3. pamu2fcfg registers key with hostname-based origin/appid: pam://$HOSTNAME
+# 4. Key data appended to existing user line or new line created
+# 5. Key metadata stored in keymap for management/removal
+# 6. FIDO2 privacy-by-design: Each registration creates unique key handle
+
+process_sudo_component() {
+  # MAIN FUNCTION: Register FIDO2 key for sudo authentication
+  # Processes sudo component if selected in main script
+  # Handles user interaction, key registration, and keymap tracking
+  
+  # Only process if sudo component is selected
+  if [[ ! " ${SELECTED[@]} " =~ " sudo " ]]; then
+    return 0
+  fi
+  echo "🔐 Processing sudo authentication..."
+  
+  # FUNCTION: Map user authentication selections to appropriate authfile
+  # Maps touch/PIN options to one of four security level authfiles
+  # Returns: Full path to target authfile for key registration
+  determine_authfile() {
+    local touch_required=false
+    local pin_required=false
+    
+    # Check selected options
+    for option in "${OPTIONS[@]}"; do
+      case "$option" in
+        "touch-required") touch_required=true ;;
+        "pin-required") pin_required=true ;;
+      esac
+    done
+    
+    # Map options to sudo-specific authfile paths
+    if [[ "$touch_required" == true && "$pin_required" == true ]]; then
+      echo "/etc/fido2/sudo-touch-pin-required"
+    elif [[ "$touch_required" == true ]]; then
+      echo "/etc/fido2/sudo-touch-required"
+    elif [[ "$pin_required" == true ]]; then
+      echo "/etc/fido2/sudo-pin-required"
+    else
+      echo "/etc/fido2/sudo-no-touch"
+    fi
+  }
+  
+  AUTHFILE=$(determine_authfile)
+  echo "📂 Target authfile: $AUTHFILE"
+  
+  # KEY REGISTRATION PHASE
+  # Interactive key registration with user input validation and FIDO2 device interaction
+  echo
+  # Ask user for required key name
+  echo
+  while [[ -z "$KEY_NAME" ]]; do
+    KEY_NAME=$(gum input --placeholder "Enter a name for this key (e.g. 'work-yubikey', 'backup-key')" --prompt "Key name (required): " || echo "")
+    if [[ -z "$KEY_NAME" ]]; then
+      echo "❌ Key name is required. Please provide a name for this key."
+    fi
+  done
+  
+  echo "🔑 Registering FIDO2 key..."
+  echo "During key registration you must:"
+  echo "  • Enter PIN on the security key"
+  echo "  • Touch the security key (if touch is required)"
+  echo "(Even if you selected no-touch authentication.)"
+  echo
+  
+  # Get hostname
+  if [[ -n "$HOSTNAME" ]]; then
+    MYHOSTNAME="$HOSTNAME"
+  else
+    echo "❌ Could not determine hostname"
+    exit 1
+  fi
+  
+  # PAMU2FCFG COMMAND CONSTRUCTION
+  # Build pamu2fcfg command with hostname-based origin/appid and security flags
+  # Base flags: -o (origin) and -i (appid) both use pam://$HOSTNAME format
+  # Additional flags added based on target authfile security level
+  PAMU2F_FLAGS="-o pam://$MYHOSTNAME -i pam://$MYHOSTNAME"
+  case "$AUTHFILE" in
+    "/etc/fido2/sudo-no-touch")
+      PAMU2F_FLAGS="$PAMU2F_FLAGS --no-user-presence"
+      ;;
+    "/etc/fido2/sudo-touch-required")
+      # Default behavior - no additional flags needed
+      ;;
+    "/etc/fido2/sudo-pin-required")
+      PAMU2F_FLAGS="$PAMU2F_FLAGS --no-user-presence --pin-verification"
+      ;;
+    "/etc/fido2/sudo-touch-pin-required")
+      PAMU2F_FLAGS="$PAMU2F_FLAGS --pin-verification"
+      ;;
+  esac
+    
+  # FIDO2 KEY REGISTRATION EXECUTION
+  # Execute pamu2fcfg with constructed flags and capture both output and exit code
+  REGISTRATION_OUTPUT=$(pamu2fcfg $PAMU2F_FLAGS 2>&1)
+  REGISTRATION_EXIT_CODE=$?
+  
+  if [[ $REGISTRATION_EXIT_CODE -eq 0 ]]; then
+    # REGISTRATION SUCCESS PATH
+    # Validate output format and extract key components for storage
+    if [[ -n "$REGISTRATION_OUTPUT" && "$REGISTRATION_OUTPUT" != *"error:"* ]]; then
+      # AUTHFILE UPDATE: Parse and store key in PAM-compatible format
+      # Expected format: username:KeyHandle,UserKey
+      # Multiple keys appended to same username line with colon separators
+      USERNAME=$(echo "$REGISTRATION_OUTPUT" | cut -d: -f1)
+      KEY_DATA=$(echo "$REGISTRATION_OUTPUT" | cut -d: -f2-)
+      
+      # Check if user already exists in authfile
+      if sudo grep -q "^$USERNAME:" "$AUTHFILE" 2>/dev/null; then
+        # User exists - append new key data to existing line (escape special characters)
+        ESCAPED_KEY_DATA=$(printf '%s\n' "$KEY_DATA" | sed 's/[[\.*^$(){}?+|/]/\\&/g')
+        sudo sed -i "s|^$USERNAME:\(.*\)|$USERNAME:\1:$KEY_DATA|" "$AUTHFILE"
+      else
+        # User doesn't exist - add new line
+        echo "$REGISTRATION_OUTPUT" | sudo tee -a "$AUTHFILE" >/dev/null
+      fi
+      
+      # KEYMAP TRACKING STORAGE
+      # Store key metadata for management and removal operations
+      # Format: keyname:authfile:key_hash:timestamp
+      TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
+      KEYMAP_FILE="/etc/fido2/keymap-sudo"
+      
+      # KEY IDENTIFICATION: Extract key handle and generate hash for tracking
+      # Key handle is first component before comma in key data
+      # SHA256 hash truncated to 10 characters for manageable identification
+      KEY_HANDLE=$(echo "$REGISTRATION_OUTPUT" | cut -d: -f2 | cut -d, -f1)
+      KEY_HASH=$(echo "$KEY_HANDLE" | sha256sum | cut -c1-10)
+      
+      # KEYMAP ENTRY: Create tracking record for key management
+      # Enables pinarchy-remove-fido2 to locate and remove specific keys
+      KEYMAP_ENTRY="$KEY_NAME:$AUTHFILE:$KEY_HASH:$TIMESTAMP"
+      echo "$KEYMAP_ENTRY" | sudo tee -a "$KEYMAP_FILE" >/dev/null
+      
+      echo "✅ FIDO2 key '$KEY_NAME' successfully registered."
+    else
+      echo "❌ FIDO2 registration failed - invalid output received."
+      echo "Output was: $REGISTRATION_OUTPUT"
+      exit 1
+    fi
+  else
+    echo "❌ FIDO2 key registration failed (exit code: $REGISTRATION_EXIT_CODE)"
+    if [[ -n "$REGISTRATION_OUTPUT" ]]; then
+      echo "Error details: $REGISTRATION_OUTPUT"
+    else
+      echo "No error message provided by pamu2fcfg"
+    fi
+    exit 1
+  fi
+}

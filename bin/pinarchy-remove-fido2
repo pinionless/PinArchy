@@ -10,7 +10,8 @@ echo
 
 # Define available FIDO2 components (single select only)
 COMPONENTS=(
-  "sudo-login"
+  "sudo"
+  "login"
   "ssh" 
   "luks"
 )
@@ -28,7 +29,8 @@ echo "Selected component: $SELECTED_COMPONENT"
 echo
 
 # Source component functions
-source "$(dirname "$0")/pinarchy-remove-fido2-sudo-login"
+source "$(dirname "$0")/pinarchy-remove-fido2-sudo"
+source "$(dirname "$0")/pinarchy-remove-fido2-login"
 source "$(dirname "$0")/pinarchy-remove-fido2-ssh"
 source "$(dirname "$0")/pinarchy-remove-fido2-luks"
 
@@ -37,8 +39,11 @@ get_component_keys() {
   local component="$1"
   
   case "$component" in
-    "sudo-login")
-      get_sudo_login_keys
+    "sudo")
+      get_sudo_keys
+      ;;
+    "login")
+      get_login_keys
       ;;
     "ssh")
       get_ssh_keys
@@ -99,9 +104,9 @@ for key_data in "${SELECTED_KEYS[@]}"; do
   second_field=$(echo "$key_data" | cut -d: -f2)
   timestamp=$(echo "$key_data" | cut -d: -f4)
   
-  # Handle different key formats (sudo-login vs SSH)
-  if [[ "$SELECTED_COMPONENT" == "sudo-login" ]]; then
-    # sudo-login format: keyname:authfile:key_hash:timestamp
+  # Handle different key formats (sudo/login vs SSH)
+  if [[ "$SELECTED_COMPONENT" == "sudo" ]] || [[ "$SELECTED_COMPONENT" == "login" ]]; then
+    # sudo/login format: keyname:authfile:key_hash:timestamp
     authfile="$second_field"
     security_icon=$(get_security_icon "$authfile")
   elif [[ "$SELECTED_COMPONENT" == "ssh" ]]; then
@@ -131,8 +136,11 @@ echo
 
 # Delegate removal to appropriate component function
 case "$SELECTED_COMPONENT" in
-  "sudo-login")
-    remove_sudo_login_keys "${SELECTED_KEYS[@]}"
+  "sudo")
+    remove_sudo_keys "${SELECTED_KEYS[@]}"
+    ;;
+  "login")
+    remove_login_keys "${SELECTED_KEYS[@]}"
     ;;
   "ssh")
     remove_ssh_keys "${SELECTED_KEYS[@]}"

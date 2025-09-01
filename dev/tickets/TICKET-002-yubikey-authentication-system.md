@@ -209,8 +209,8 @@ The `omarchy-setup-fido2` script needs to be expanded with **multiple configurat
 ### **1. Sudo & Login** 
 ```bash
 omarchy-setup-fido2 --auth
-# or 
-omarchy-setup-fido2 --sudo-login
+# or separate components
+omarchy-setup-fido2 --sudo --login
 ```
 - Current sudo functionality (already works)
 - Current polkit functionality (GUI admin operations already work)

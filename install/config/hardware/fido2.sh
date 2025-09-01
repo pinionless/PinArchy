@@ -2,61 +2,76 @@
 
 # FIDO2 Hardware Authentication Setup
 # Configures PAM modules for sudo, login, and polkit authentication
-# Sections: sudo-login (implemented), ssh (placeholder), luks (placeholder)
+# Sections: sudo and login (implemented), ssh (placeholder), luks (placeholder)
 
 #
-# SECTION 1: sudo-login - Configure PAM for sudo and login authentication
+# SECTION 1: sudo and login - Configure PAM for separate sudo and login authentication
 #
 
 # Install required FIDO2 packages
 sudo pacman -S --noconfirm --needed libfido2 pam-u2f openssh
 
-# Create FIDO2 configuration directory and prepare four security level authfiles:
-# - /etc/fido2/no-touch: Presence only (no touch, no PIN)
-# - /etc/fido2/touch-required: Touch required (default)  
-# - /etc/fido2/pin-required: PIN required (no touch)
-# - /etc/fido2/touch-pin-required: Both touch AND PIN required
-# - /etc/fido2/keymap: Maps key names to authfiles and handles
-# This allows per-device security levels - users register keys to appropriate authfile
+# Create FIDO2 configuration directory and prepare separate authfiles for sudo and login:
+# SUDO authfiles:
+# - /etc/fido2/sudo-no-touch: Sudo with presence only (no touch, no PIN)
+# - /etc/fido2/sudo-touch-required: Sudo with touch required
+# - /etc/fido2/sudo-pin-required: Sudo with PIN required (no touch)
+# - /etc/fido2/sudo-touch-pin-required: Sudo with both touch AND PIN required
+# LOGIN authfiles:
+# - /etc/fido2/login-no-touch: Login with presence only (no touch, no PIN)
+# - /etc/fido2/login-touch-required: Login with touch required
+# - /etc/fido2/login-pin-required: Login with PIN required (no touch)
+# - /etc/fido2/login-touch-pin-required: Login with both touch AND PIN required
+# KEYMAPS:
+# - /etc/fido2/keymap-sudo: Maps sudo key names to authfiles and handles
+# - /etc/fido2/keymap-login: Maps login key names to authfiles and handles
+# - /etc/fido2/keymap-luks: Maps LUKS key names to device credentials
 sudo mkdir -p /etc/fido2
 
-# Create empty authfiles and keymap
-sudo touch /etc/fido2/no-touch
-sudo touch /etc/fido2/touch-required
-sudo touch /etc/fido2/pin-required
-sudo touch /etc/fido2/touch-pin-required
-sudo touch /etc/fido2/keymap
+# Create separate authfiles for sudo and login
+sudo touch /etc/fido2/sudo-no-touch
+sudo touch /etc/fido2/sudo-touch-required
+sudo touch /etc/fido2/sudo-pin-required
+sudo touch /etc/fido2/sudo-touch-pin-required
+sudo touch /etc/fido2/login-no-touch
+sudo touch /etc/fido2/login-touch-required
+sudo touch /etc/fido2/login-pin-required
+sudo touch /etc/fido2/login-touch-pin-required
+
+# Create separate keymaps
+sudo touch /etc/fido2/keymap-sudo
+sudo touch /etc/fido2/keymap-login
 sudo touch /etc/fido2/keymap-luks
 
-# Configure sudo PAM with four security levels
+# Configure sudo PAM with separate sudo-specific authfiles
 # PAM tries each authfile in order with 'sufficient' - first match authenticates
 if ! grep -q pam_u2f.so /etc/pam.d/sudo; then
-    sudo sed -i '1i auth    sufficient pam_u2f.so cue authfile=/etc/fido2/no-touch userpresence=0' /etc/pam.d/sudo
-    sudo sed -i '2i auth    sufficient pam_u2f.so cue authfile=/etc/fido2/touch-required' /etc/pam.d/sudo
-    sudo sed -i '3i auth    sufficient pam_u2f.so cue authfile=/etc/fido2/pin-required userpresence=0 pinverification=1' /etc/pam.d/sudo
-    sudo sed -i '4i auth    sufficient pam_u2f.so cue authfile=/etc/fido2/touch-pin-required pinverification=1' /etc/pam.d/sudo
+    sudo sed -i '1i auth    sufficient pam_u2f.so cue authfile=/etc/fido2/sudo-no-touch userpresence=0' /etc/pam.d/sudo
+    sudo sed -i '2i auth    sufficient pam_u2f.so cue authfile=/etc/fido2/sudo-touch-required' /etc/pam.d/sudo
+    sudo sed -i '3i auth    sufficient pam_u2f.so cue authfile=/etc/fido2/sudo-pin-required userpresence=0 pinverification=1' /etc/pam.d/sudo
+    sudo sed -i '4i auth    sufficient pam_u2f.so cue authfile=/etc/fido2/sudo-touch-pin-required pinverification=1' /etc/pam.d/sudo
 fi
 
-# Configure console login PAM with same four security levels
+# Configure console login PAM with separate login-specific authfiles
 if ! grep -q pam_u2f.so /etc/pam.d/login; then
-    sudo sed -i '1i auth    sufficient pam_u2f.so cue authfile=/etc/fido2/no-touch userpresence=0' /etc/pam.d/login
-    sudo sed -i '2i auth    sufficient pam_u2f.so cue authfile=/etc/fido2/touch-required' /etc/pam.d/login
-    sudo sed -i '3i auth    sufficient pam_u2f.so cue authfile=/etc/fido2/pin-required userpresence=0 pinverification=1' /etc/pam.d/login
-    sudo sed -i '4i auth    sufficient pam_u2f.so cue authfile=/etc/fido2/touch-pin-required pinverification=1' /etc/pam.d/login
+    sudo sed -i '1i auth    sufficient pam_u2f.so cue authfile=/etc/fido2/login-no-touch userpresence=0' /etc/pam.d/login
+    sudo sed -i '2i auth    sufficient pam_u2f.so cue authfile=/etc/fido2/login-touch-required' /etc/pam.d/login
+    sudo sed -i '3i auth    sufficient pam_u2f.so cue authfile=/etc/fido2/login-pin-required userpresence=0 pinverification=1' /etc/pam.d/login
+    sudo sed -i '4i auth    sufficient pam_u2f.so cue authfile=/etc/fido2/login-touch-pin-required pinverification=1' /etc/pam.d/login
 fi
 
-# Configure polkit PAM for GUI admin operations
+# Configure polkit PAM for GUI admin operations (use sudo authfiles since polkit is for admin tasks)
 if [ -f /etc/pam.d/polkit-1 ] && ! grep -q 'pam_u2f.so' /etc/pam.d/polkit-1; then
-    sudo sed -i '1i auth      sufficient pam_u2f.so cue authfile=/etc/fido2/no-touch userpresence=0' /etc/pam.d/polkit-1
-    sudo sed -i '2i auth      sufficient pam_u2f.so cue authfile=/etc/fido2/touch-required' /etc/pam.d/polkit-1
-    sudo sed -i '3i auth      sufficient pam_u2f.so cue authfile=/etc/fido2/pin-required userpresence=0 pinverification=1' /etc/pam.d/polkit-1
-    sudo sed -i '4i auth      sufficient pam_u2f.so cue authfile=/etc/fido2/touch-pin-required pinverification=1' /etc/pam.d/polkit-1
+    sudo sed -i '1i auth      sufficient pam_u2f.so cue authfile=/etc/fido2/sudo-no-touch userpresence=0' /etc/pam.d/polkit-1
+    sudo sed -i '2i auth      sufficient pam_u2f.so cue authfile=/etc/fido2/sudo-touch-required' /etc/pam.d/polkit-1
+    sudo sed -i '3i auth      sufficient pam_u2f.so cue authfile=/etc/fido2/sudo-pin-required userpresence=0 pinverification=1' /etc/pam.d/polkit-1
+    sudo sed -i '4i auth      sufficient pam_u2f.so cue authfile=/etc/fido2/sudo-touch-pin-required pinverification=1' /etc/pam.d/polkit-1
 elif [ ! -f /etc/pam.d/polkit-1 ]; then
     sudo tee /etc/pam.d/polkit-1 >/dev/null <<'EOF'
-auth      sufficient pam_u2f.so cue authfile=/etc/fido2/no-touch userpresence=0
-auth      sufficient pam_u2f.so cue authfile=/etc/fido2/touch-required
-auth      sufficient pam_u2f.so cue authfile=/etc/fido2/pin-required userpresence=0 pinverification=1
-auth      sufficient pam_u2f.so cue authfile=/etc/fido2/touch-pin-required pinverification=1
+auth      sufficient pam_u2f.so cue authfile=/etc/fido2/sudo-no-touch userpresence=0
+auth      sufficient pam_u2f.so cue authfile=/etc/fido2/sudo-touch-required
+auth      sufficient pam_u2f.so cue authfile=/etc/fido2/sudo-pin-required userpresence=0 pinverification=1
+auth      sufficient pam_u2f.so cue authfile=/etc/fido2/sudo-touch-pin-required pinverification=1
 auth      required pam_unix.so
 
 account   required pam_unix.so
