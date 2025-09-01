@@ -9,7 +9,7 @@
 #
 
 # Install required FIDO2 packages
-sudo pacman -S --noconfirm --needed libfido2 pam-u2f openssh
+sudo pacman -S --noconfirm --needed libfido2 pam-u2f
 
 # Create FIDO2 configuration directory and prepare separate authfiles for sudo and login:
 # SUDO authfiles:
@@ -88,10 +88,12 @@ fi
 # SECTION 2: ssh - SSH FIDO2 key support (placeholder for future)
 #
 
-# TODO: SSH FIDO2 implementation
+sudo pacman -S --noconfirm --needed openssh
 
 #
 # SECTION 3: luks - LUKS disk encryption with FIDO2 (placeholder for future)
 #
 
-# TODO: LUKS FIDO2 implementation
+# LUKS with FIDO2 setup will not be automated during installation. Requires changes to initramfs, swith to sd-encrypt and more.
+# Required changes can will be implemented on the setup of the first FIDO2 key via: bin/pinarchy-setup-fido2
+# In the future user can be prompted during installation if they want to set up LUKS with FIDO2 and the script can make the required changes automatically.
