@@ -68,6 +68,7 @@ add_brightness_control() {
       "exec": "pinarchy-cmd-lgtv-brightness-get \($ip)",
       "format": "{}%",
       "interval": 120,
+      "signal": 8,
       "tooltip": "TV Brightness Level"
     } |
     .["custom/lgtv-brightness-up"] = {
@@ -76,6 +77,29 @@ add_brightness_control() {
       "on-click": "pinarchy-cmd-lgtv-brightness \($ip) +10"
     }
   ' "$waybar_config" > "$waybar_config.tmp" && mv "$waybar_config.tmp" "$waybar_config"
+  
+  # Add CSS styling for brightness controls
+  local waybar_css="$HOME/.config/waybar/style.css"
+  
+  # Check if brightness styles already exist
+  if ! grep -q "#custom-lgtv-brightness-down" "$waybar_css" 2>/dev/null; then
+    cat >> "$waybar_css" << 'EOF'
+
+#custom-lgtv-brightness-down {
+  min-width: 12px;
+  margin-left: 7.5px;
+  padding-right: 6px;
+}
+#custom-lgtv-brightness-value {
+  min-width: 12px;
+}
+#custom-lgtv-brightness-up {
+  min-width: 12px;
+  margin-right: 7.5px;
+  padding-right: 2px;
+}
+EOF
+  fi
   
   # Restart Waybar to apply changes
   omarchy-restart-waybar
@@ -106,6 +130,14 @@ remove_brightness_control() {
     del(.["custom/lgtv-brightness-value"]) |
     del(.["custom/lgtv-brightness-up"])
   ' "$waybar_config" > "$waybar_config.tmp" && mv "$waybar_config.tmp" "$waybar_config"
+  
+  # Remove CSS styling for brightness controls
+  local waybar_css="$HOME/.config/waybar/style.css"
+  
+  # Remove the brightness CSS block (from blank line before #custom-lgtv-brightness-down to end of #custom-lgtv-brightness-up)
+  if grep -q "#custom-lgtv-brightness-down" "$waybar_css" 2>/dev/null; then
+    sed -i '/^$/,/^#custom-lgtv-brightness-up/{ /^#custom-lgtv-brightness-down/,/^}$/d; /^#custom-lgtv-brightness-value/,/^}$/d; /^#custom-lgtv-brightness-up/,/^}$/d; }' "$waybar_css"
+  fi
   
   # Restart Waybar to apply changes
   omarchy-restart-waybar

@@ -75,6 +75,29 @@ add_volume_control() {
     }
   ' "$waybar_config" > "$waybar_config.tmp" && mv "$waybar_config.tmp" "$waybar_config"
   
+  # Add CSS styling for volume controls
+  local waybar_css="$HOME/.config/waybar/style.css"
+  
+  # Check if volume styles already exist
+  if ! grep -q "#custom-lgtv-volume-down" "$waybar_css" 2>/dev/null; then
+    cat >> "$waybar_css" << 'EOF'
+
+#custom-lgtv-volume-down {
+  min-width: 12px;
+  margin-left: 7.5px;
+}
+#custom-lgtv-tv-icon {
+  min-width: 12px;
+  padding-right: 5px;
+  padding-left: 1px;
+}
+#custom-lgtv-volume-up {
+  min-width: 12px;
+  margin-right: 7.5px;
+}
+EOF
+  fi
+  
   # Restart Waybar to apply changes
   omarchy-restart-waybar
   
@@ -104,6 +127,14 @@ remove_volume_control() {
     del(.["custom/lgtv-tv-icon"]) |
     del(.["custom/lgtv-volume-up"])
   ' "$waybar_config" > "$waybar_config.tmp" && mv "$waybar_config.tmp" "$waybar_config"
+  
+  # Remove CSS styling for volume controls
+  local waybar_css="$HOME/.config/waybar/style.css"
+  
+  # Remove the volume CSS block
+  if grep -q "#custom-lgtv-volume-down" "$waybar_css" 2>/dev/null; then
+    sed -i '/^$/,/^#custom-lgtv-volume-up/{ /^#custom-lgtv-volume-down/,/^}$/d; /^#custom-lgtv-tv-icon/,/^}$/d; /^#custom-lgtv-volume-up/,/^}$/d; }' "$waybar_css"
+  fi
   
   # Restart Waybar to apply changes
   omarchy-restart-waybar

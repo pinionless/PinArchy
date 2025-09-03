@@ -53,6 +53,9 @@ fi
 # Set new brightness
 if bscpylgtvcommand "$TV_IP" set_current_picture_settings "{\"backlight\": $NEW_BRIGHTNESS}" -p "$HOME/.config/lgtv/bscpylgtv.sqlite" &>/dev/null; then
     echo "✅ TV brightness ${ACTION}d to $NEW_BRIGHTNESS at $TV_IP!"
+    
+    # Trigger Waybar update for brightness value display
+    pkill -SIGRTMIN+8 waybar 2>/dev/null || true
 else
     echo "❌ Failed to $ACTION TV brightness at $TV_IP"
     exit 1

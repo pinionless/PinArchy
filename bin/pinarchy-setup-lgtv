@@ -50,7 +50,7 @@ show_main_menu() {
     fi
     
     # Add exit option
-    OPTIONS+=("✖ Exit")
+    OPTIONS+=("⨯ Exit")
     
     # Use gum for consistent interface
     SELECTED=$(gum choose --header "Select an option:" "${OPTIONS[@]}")
@@ -60,7 +60,7 @@ show_main_menu() {
         add_tv
         show_completion_message "TV configuration completed!"
         ;;
-      "✖ Exit")
+      "⨯ Exit")
         echo "👋 Goodbye!"
         exit 0
         ;;
