@@ -20,6 +20,7 @@ Completed tickets should be marked and moved to completed section.
 - 🔴 [TICKET-019](./TICKET-019-limine-multi-boot-menu.md) - Limine Multi-Boot Menu Integration
 
 ## Completed Tickets
+- 🟢 [TICKET-021](./TICKET-021-limine-snapper-pacman-hook.md) - Limine Snapper Pacman Hook for vmlinuz Movement
 - 🟢 [TICKET-002](./TICKET-002-yubikey-authentication-system.md) - YubiKey Authentication System
 - 🟢 [TICKET-014](./TICKET-014-starship-theme-integration.md) - Starship Theme Integration
 - 🟢 [TICKET-015](./TICKET-015-simple-archlinux-ascii-art-boot.md) - Simple ArchLinux ASCII Art for boot.sh (Replaced complex braille characters with simple "PinArchy" block ASCII art)

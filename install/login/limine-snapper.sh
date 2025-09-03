@@ -103,6 +103,21 @@ EOF
   sudo sed -i "s|default_image=\"/boot/initramfs-linux.img\"|default_image=\"${CUSTOM_BOOT_DIR}/initramfs-linux.img\"|" /etc/mkinitcpio.d/linux.preset  
   sudo sed -i "s|#fallback_image=\"/boot/initramfs-linux-fallback.img\"|fallback_image=\"${CUSTOM_BOOT_DIR}/initramfs-linux-fallback.img\"|" /etc/mkinitcpio.d/linux.preset
 
+  # Create pacman hook to automate kernel file moves
+  sudo mkdir -p /etc/pacman.d/hooks
+  sudo tee /etc/pacman.d/hooks/89-efi-sync.hook <<EOF >/dev/null
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = linux
+
+[Action]
+Description = Moving kernel files to /boot/EFI/${CLEAN_HOST}/...
+When = PostTransaction
+Exec = /bin/sh -c 'if [ -f /boot/vmlinuz-linux ]; then mv -f /boot/vmlinuz-linux /boot/EFI/${CLEAN_HOST}/vmlinuz-linux; fi'
+EOF
+
   sudo pacman -S --noconfirm --needed limine-snapper-sync limine-mkinitcpio-hook
   sudo limine-update
 
