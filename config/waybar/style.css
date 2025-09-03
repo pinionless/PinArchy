@@ -10,7 +10,9 @@
   font-family: CaskaydiaMono Nerd Font;
   font-size: 12px;
 }
-
+label:hover {
+  color: @hover;
+}
 .modules-left {
   margin-left: 8px;
 }

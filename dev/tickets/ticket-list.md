@@ -18,6 +18,7 @@ Completed tickets should be marked and moved to completed section.
 ### Low Priority
 - 🔴 [TICKET-017](./TICKET-017-fido2-security-automation.md) - FIDO2 Security Automation
 - 🔴 [TICKET-019](./TICKET-019-limine-multi-boot-menu.md) - Limine Multi-Boot Menu Integration
+- 🔴 [TICKET-022](./TICKET-022-waybar-hover-effects.md) - Waybar Hover Effects
 
 ## Completed Tickets
 - 🟢 [TICKET-021](./TICKET-021-limine-snapper-pacman-hook.md) - Limine Snapper Pacman Hook for vmlinuz Movement

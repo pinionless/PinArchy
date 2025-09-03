@@ -2,3 +2,4 @@
 @define-color background #eff1f5; /* base */
 @define-color border     #dce0e8; /* crust */
 @define-color accent     #1e66f5; /* blue */
+@define-color hover      #2c2f4a; /* darker text for hover */
