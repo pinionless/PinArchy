@@ -19,7 +19,7 @@ Implement hover effects for Waybar modules to improve user experience and visual
 Low
 
 ## Status
-Todo
+Done
 
 ## Preparation
 [Placeholder. Leave empty.]
