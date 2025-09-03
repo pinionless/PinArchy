@@ -182,7 +182,7 @@ tv_details() {
     "Turn off on shutdown" 
     "Volume control"
     "Brightness control"
-    "✖ Back"
+    "← Back"
   )
   TV_ACTION=$(gum choose --header "Select action for $tv_name:" "${TV_OPTIONS[@]}")
   

@@ -37,7 +37,13 @@
 #bluetooth,
 #pulseaudio,
 #custom-omarchy,
-#custom-update {
+#custom-update,
+#custom-lgtv-volume-down,
+#custom-lgtv-tv-icon,
+#custom-lgtv-volume-up,
+#custom-lgtv-brightness-down,
+#custom-lgtv-brightness-value,
+#custom-lgtv-brightness-up {
   min-width: 12px;
   margin: 0 7.5px;
 }
