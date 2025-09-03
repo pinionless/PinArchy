@@ -12,7 +12,7 @@ if [ "$PINARCHY_LG_TV" = "y" ]; then
   
   # Install bscpylgtv using mise
   echo "Installing bscpylgtv..."
-  mise run python -m pip install bscpylgtv
+  mise exec python -- python -m pip install bscpylgtv
   
 else
   echo "LG TV management skipped (not requested in Q&A)"
