@@ -8,6 +8,7 @@ OMARCHY_INSTALL="$OMARCHY_PATH/install"
 export PATH="$OMARCHY_PATH/bin:$PATH"
 
 # Preparation
+source $OMARCHY_INSTALL/preflight/qna.sh
 source $OMARCHY_INSTALL/preflight/show-env.sh
 source $OMARCHY_INSTALL/preflight/trap-errors.sh
 source $OMARCHY_INSTALL/preflight/guard.sh
@@ -48,6 +49,7 @@ source $OMARCHY_INSTALL/config/hardware/usb-autosuspend.sh
 source $OMARCHY_INSTALL/config/hardware/ignore-power-button.sh
 source $OMARCHY_INSTALL/config/hardware/nvidia.sh
 source $OMARCHY_INSTALL/config/hardware/fix-f13-amd-audio-input.sh
+source $OMARCHY_INSTALL/config/hardware/lgtv.sh
 
 # Login
 source $OMARCHY_INSTALL/login/plymouth.sh
