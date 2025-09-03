@@ -14,7 +14,7 @@ source "$SCRIPT_DIR/pinarchy-lib/fn-lgtv-shutdown.sh"
 source "$SCRIPT_DIR/pinarchy-lib/fn-lgtv-volume.sh"
 
 # Check if bscpylgtv is installed
-if python -c "import bscpylgtv" &>/dev/null; then
+if ! python -c "import bscpylgtv" &>/dev/null; then
     echo "❌ bscpylgtv is not installed."
     echo "Please run the full installation first or install it manually:"
     echo "  mise exec python -- python -m pip install bscpylgtv"
@@ -32,6 +32,7 @@ show_completion_message() {
 show_main_menu() {
   while true; do
     clear
+    omarchy-show-logo
     echo "📺 PinArchy LG TV Management"
     echo
     
@@ -49,7 +50,7 @@ show_main_menu() {
     fi
     
     # Add exit option
-    OPTIONS+=("Exit")
+    OPTIONS+=("✖ Exit")
     
     # Use gum for consistent interface
     SELECTED=$(gum choose --header "Select an option:" "${OPTIONS[@]}")
@@ -59,7 +60,7 @@ show_main_menu() {
         add_tv
         show_completion_message "TV configuration completed!"
         ;;
-      "Exit")
+      "✖ Exit")
         echo "👋 Goodbye!"
         exit 0
         ;;

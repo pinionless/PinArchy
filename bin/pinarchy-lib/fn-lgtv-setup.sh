@@ -182,6 +182,7 @@ tv_details() {
     "Turn off on shutdown" 
     "Volume control"
     "Brightness control"
+    "✖ Back"
   )
   TV_ACTION=$(gum choose --header "Select action for $tv_name:" "${TV_OPTIONS[@]}")
   
@@ -201,6 +202,9 @@ tv_details() {
       ;;
     "Brightness control")
       manage_brightness_control "$tv_ip" "$tv_name"
+      ;;
+    "← Back")
+      return 0
       ;;
   esac
 }
