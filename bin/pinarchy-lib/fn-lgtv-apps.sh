@@ -95,7 +95,8 @@ get_installed_tvapps() {
   # Find all lgtv-*.desktop files and extract their titles
   local temp_file=$(mktemp)
   
-  for desktop_file in "$apps_dir"/lgtv-*.desktop; do
+  # Use find instead of glob to properly handle no matches case
+  while IFS= read -r -d '' desktop_file; do
     if [ -f "$desktop_file" ]; then
       # Extract Name field from desktop file
       local app_name=$(grep "^Name=" "$desktop_file" | cut -d'=' -f2-)
@@ -103,7 +104,7 @@ get_installed_tvapps() {
         echo "$app_name|$desktop_file" >> "$temp_file"
       fi
     fi
-  done
+  done < <(find "$apps_dir" -name "lgtv-*.desktop" -print0 2>/dev/null)
   
   if [ ! -s "$temp_file" ]; then
     rm -f "$temp_file"
