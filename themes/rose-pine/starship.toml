@@ -15,14 +15,14 @@ palette = 'starship'
 [palettes.starship]
 color_success = '#33cc38'
 color_error = '#cc241d'
-color_text = '#e0def4'    # Text - soft white
+color_text = '#2F4F4F'    # Text - soft white
 color_a = '#c4a7e7'       # Iris - purple
 color_b = '#9ccfd8'       # Foam - cyan
 color_c = '#f6c177'       # Gold - yellow
 
 [os]
 disabled = false
-style = "bg:color_a fg:bright-white"
+style = "bg:color_a fg:color_text"
 
 [os.symbols]
 Windows = "󰍲"

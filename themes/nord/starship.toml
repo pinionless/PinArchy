@@ -15,14 +15,14 @@ palette = 'starship'
 [palettes.starship]
 color_success = '#33cc38'
 color_error = '#cc241d'
-color_text = '#d8dee9'    # Snow Storm - light gray
-color_a = '#5e81ac'       # Frost - blue
-color_b = '#a3be8c'       # Aurora - green
-color_c = '#88c0d0'       # Frost - cyan
+color_text = '#2e3440'    # Pure white text
+color_a = '#b48ead'       # Dark gray - good contrast with white text
+color_b = '#a3be8c'       # Medium gray - good contrast with white text
+color_c = '#ebcb8b'       # Lighter gray - good contrast with white text
 
 [os]
 disabled = false
-style = "bg:color_a fg:bright-white"
+style = "bg:color_a fg:color_text"
 
 [os.symbols]
 Windows = "󰍲"

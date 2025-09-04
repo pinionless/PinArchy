@@ -22,7 +22,7 @@ color_c = '#404040'       # Lighter gray - good contrast with white text
 
 [os]
 disabled = false
-style = "bg:color_a fg:bright-white"
+style = "bg:color_a fg:color_text"
 
 [os.symbols]
 Windows = "󰍲"

@@ -15,14 +15,14 @@ palette = 'starship'
 [palettes.starship]
 color_success = '#33cc38'
 color_error = '#cc241d'
-color_text = '#a9b1d6'    # Similar to Tokyo Night
-color_a = '#73daca'       # Jade green - primary accent
-color_b = '#9ece6a'       # Lime green
-color_c = '#bb9af7'       # Purple accent
+color_text = '#2F3C48'    # Pure white text
+color_a = '#D6CFC5'       # Dark gray - good contrast with white text
+color_b = '#00A86B'       # Medium gray - good contrast with white text
+color_c = '#F0E68C'       # Lighter gray - good contrast with white text
 
 [os]
 disabled = false
-style = "bg:color_a fg:bright-white"
+style = "bg:color_a fg:color_text"
 
 [os.symbols]
 Windows = "󰍲"

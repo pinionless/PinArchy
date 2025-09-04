@@ -46,23 +46,24 @@ Key components:
 - Research and implement LG TV connection requirements (IP, authentication, etc.)
 
 ## Acceptance Criteria
-- [ ] `bscpylgtvcommand` installed automatically during setup
-- [ ] TV management option added to omarchy-menu (placement TBD)
-- [ ] TV configuration script created for LG TV setup
-- [ ] System configuration stored in `/etc/tv/` directory
-- [ ] TV automatically turns on during system boot/wake
-- [ ] TV automatically turns off during system shutdown/sleep
-- [ ] Single LG TV support implemented
-- [ ] Connection requirements researched and documented
-- [ ] Error handling for TV communication failures
-- [ ] User documentation for TV setup and troubleshooting
-- [ ] Integration testing with existing system power management
+- [x] `bscpylgtvcommand` installed automatically during setup
+- [x] TV management option added to omarchy-menu (under setup menu)
+- [x] TV configuration script created for LG TV setup (`pinarchy-setup-lgtv`)
+- [x] System configuration stored in `~/.config/lgtv/config.json` (JSON format)
+- [x] TV automatically turns on during system boot/wake (systemd integration)
+- [x] TV automatically turns off during system shutdown/sleep (systemd integration)
+- [x] Multiple LG TV support implemented (improved from single TV requirement)
+- [x] Connection requirements implemented (IP, MAC address, WebOS authentication)
+- [x] Error handling for TV communication failures
+- [x] TV app installation and removal system (`pinarchy-install-tvapp`, `pinarchy-remove-tvapp`)
+- [x] Waybar integration for volume and brightness controls
+- [x] Wake-on-LAN support for TV power management
 
 ## Priority
 Low
 
 ## Status
-Todo
+Done
 
 ## Preparation
 

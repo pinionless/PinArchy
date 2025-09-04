@@ -9,17 +9,17 @@ Completed tickets should be marked and moved to completed section.
 ## Active Tickets
 
 ### High Priority
-- 🟡 [TICKET-018](./TICKET-018-tv-management-lg.md) - TV Management for LG TVs
 
 ### Medium Priority
 - 🔴 [TICKET-020](./TICKET-020-hibernation-swapfile-subvolume.md) - Hibernation with Swapfile in Subvolume
-- 🟡 [TICKET-016](./TICKET-016-improve-starship-color-contrast.md) - Improve Starship Color Contrast
 
 ### Low Priority
 - 🔴 [TICKET-017](./TICKET-017-fido2-security-automation.md) - FIDO2 Security Automation
 - 🔴 [TICKET-019](./TICKET-019-limine-multi-boot-menu.md) - Limine Multi-Boot Menu Integration
 
 ## Completed Tickets
+- 🟢 [TICKET-016](./TICKET-016-improve-starship-color-contrast.md) - Improve Starship Color Contrast
+- 🟢 [TICKET-018](./TICKET-018-tv-management-lg.md) - TV Management for LG TVs
 - 🟢 [TICKET-022](./TICKET-022-waybar-hover-effects.md) - Waybar Hover Effects
 - 🟢 [TICKET-021](./TICKET-021-limine-snapper-pacman-hook.md) - Limine Snapper Pacman Hook for vmlinuz Movement
 - 🟢 [TICKET-002](./TICKET-002-yubikey-authentication-system.md) - YubiKey Authentication System

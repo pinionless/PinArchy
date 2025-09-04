@@ -15,14 +15,14 @@ palette = 'starship'
 [palettes.starship]
 color_success = '#33cc38'
 color_error = '#cc241d'
-color_text = '#cad3f5'    # Foreground - light lavender
-color_a = '#8aadf4'       # Blue - primary accent
-color_b = '#a6da95'       # Green - secondary accent
-color_c = '#f5bde6'       # Pink - tertiary accent
+color_text = '#303446'    
+color_a = '#ca9ee6'       
+color_b = '#81c8be'       
+color_c = '#f5bde6'       
 
 [os]
 disabled = false
-style = "bg:color_a fg:bright-white"
+style = "bg:color_a fg:color_text"
 
 [os.symbols]
 Windows = "󰍲"

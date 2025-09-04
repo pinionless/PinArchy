@@ -15,14 +15,14 @@ palette = 'starship'
 [palettes.starship]
 color_success = '#33cc38'
 color_error = '#cc241d'
-color_text = '#dcd7ba'    # Fuji White
-color_a = '#7e9cd8'       # Crystal Blue
-color_b = '#98bb6c'       # Spring Green
-color_c = '#e6c384'       # Autumn Yellow
+color_text = '#171f40'
+color_a = '#a292a3'
+color_b = '#82c0af' 
+color_c = '#d4c787'  
 
 [os]
 disabled = false
-style = "bg:color_a fg:bright-white"
+style = "bg:color_a fg:color_text"
 
 [os.symbols]
 Windows = "󰍲"
