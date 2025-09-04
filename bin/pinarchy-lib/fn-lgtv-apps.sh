@@ -40,6 +40,28 @@ add_tv_app() {
   local app_id=$(echo "$selected_app" | sed 's/.* | //')
   
   echo "🎯 Selected: $app_title ($app_id)"
+  echo
+  
+  # Prompt for icon URL
+  local icon_url=$(gum input --prompt "Icon URL> " --placeholder "See https://dashboardicons.com (must use PNG!)")
+  local icon_line=""
+  
+  if [ -n "$icon_url" ]; then
+    echo "📥 Downloading icon..."
+    local icon_dir="$HOME/.local/share/applications/icons"
+    mkdir -p "$icon_dir"
+    local icon_path="$icon_dir/lgtv-${app_id}.png"
+    
+    if curl -sL -o "$icon_path" "$icon_url"; then
+      icon_line="Icon=$icon_path"
+      echo "✅ Icon downloaded successfully"
+    else
+      echo "❌ Failed to download icon, proceeding without icon"
+    fi
+  else
+    echo "ℹ️ No icon URL provided, proceeding without icon"
+  fi
+  echo
   
   # Create desktop file
   local desktop_file="$HOME/.local/share/applications/lgtv-${app_id}.desktop"
@@ -51,15 +73,11 @@ Type=Application
 Name=$app_title
 Comment=Launch $app_title on $tv_name TV
 Exec=pinarchy-cmd-lgtv-launch $tv_ip $app_id
-Icon=tv
+${icon_line}
 Terminal=false
 Categories=AudioVideo;TV;
 StartupNotify=false
 EOF
-  
-  # Track installed app
-  local tvapps_file="$HOME/.config/lgtv/tvapps"
-  echo "${app_title}:${app_id}:${desktop_file}" >> "$tvapps_file"
   
   echo "✅ TV app launcher created!"
   echo "   App: $app_title"
@@ -70,25 +88,36 @@ EOF
 }
 
 get_installed_tvapps() {
-  local tvapps_file="$HOME/.config/lgtv/tvapps"
+  local apps_dir="$HOME/.local/share/applications"
   
-  echo "📱 Select installed TV app to remove:"
+  echo "📱 Select installed TV app to remove:" >&2
   
-  # Read file and create fzf format (show only title, but return full line for processing)
+  # Find all lgtv-*.desktop files and extract their titles
   local temp_file=$(mktemp)
-  cat "$tvapps_file" > "$temp_file"
   
-  # Create display format (just title) but track line numbers
-  local selected_line=$(cat "$temp_file" | nl -nln | while read -r line_num line_content; do
-    local title=$(echo "$line_content" | cut -d':' -f1)
-    echo "$title|$line_num"
-  done | fzf --prompt="Select TV App to Remove: " --height=15 --reverse --border --delimiter='|' --with-nth=1 | cut -d'|' -f2)
+  for desktop_file in "$apps_dir"/lgtv-*.desktop; do
+    if [ -f "$desktop_file" ]; then
+      # Extract Name field from desktop file
+      local app_name=$(grep "^Name=" "$desktop_file" | cut -d'=' -f2-)
+      if [ -n "$app_name" ]; then
+        echo "$app_name|$desktop_file" >> "$temp_file"
+      fi
+    fi
+  done
   
-  if [ -n "$selected_line" ]; then
-    sed -n "${selected_line}p" "$temp_file"
+  if [ ! -s "$temp_file" ]; then
+    rm -f "$temp_file"
+    return 1
   fi
   
+  # Use fzf to select app (show name, return full line)
+  local selected=$(cat "$temp_file" | fzf --prompt="Select TV App to Remove: " --height=15 --reverse --border --delimiter='|' --with-nth=1)
+  
   rm -f "$temp_file"
+  
+  if [ -n "$selected" ]; then
+    echo "$selected"
+  fi
   
   return $?
 }
@@ -101,30 +130,30 @@ remove_tvapp() {
     return 1
   fi
   
-  # Parse the selected app (format: "title:app_id:desktop_file")
-  local app_title=$(echo "$selected_app" | cut -d':' -f1)
-  local app_id=$(echo "$selected_app" | cut -d':' -f2)
-  local desktop_file=$(echo "$selected_app" | cut -d':' -f3)
+  # Parse the selected app (format: "app_name|desktop_file_path")
+  local app_name=$(echo "$selected_app" | cut -d'|' -f1)
+  local desktop_file=$(echo "$selected_app" | cut -d'|' -f2)
   
-  echo "🗑️ Removing TV app: $app_title"
+  echo "🗑️ Removing TV app: $app_name"
   
   # Remove desktop file if it exists
   if [ -f "$desktop_file" ]; then
+    # Check if there's a custom icon to remove
+    local icon_value=$(grep "^Icon=" "$desktop_file" | cut -d'=' -f2-)
+    
     rm "$desktop_file"
     echo "✅ Desktop file removed: $desktop_file"
+    
+    # Remove custom icon if it exists and is in our icons directory
+    if [[ "$icon_value" == *"/.local/share/applications/icons/"* ]] && [ -f "$icon_value" ]; then
+      rm "$icon_value"
+      echo "✅ Custom icon removed: $icon_value"
+    fi
   else
     echo "⚠️ Desktop file not found: $desktop_file"
   fi
   
-  # Remove from tracking file
-  local tvapps_file="$HOME/.config/lgtv/tvapps"
-  local temp_file="${tvapps_file}.tmp"
-  
-  # Create temp file without the selected line
-  grep -v "^${app_title}:${app_id}:${desktop_file}$" "$tvapps_file" > "$temp_file" || true
-  mv "$temp_file" "$tvapps_file"
-  
-  echo "✅ TV app '$app_title' removed successfully"
+  echo "✅ TV app '$app_name' removed successfully"
   
   return 0
 }
