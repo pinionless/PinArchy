@@ -93,7 +93,7 @@ get_installed_tvapps() {
   echo "📱 Select installed TV app to remove:" >&2
   
   # Find all lgtv-*.desktop files and extract their titles
-  local temp_file=$(mktemp)
+  local apps_list=""
   
   # Use find instead of glob to properly handle no matches case
   while IFS= read -r -d '' desktop_file; do
@@ -101,20 +101,17 @@ get_installed_tvapps() {
       # Extract Name field from desktop file
       local app_name=$(grep "^Name=" "$desktop_file" | cut -d'=' -f2-)
       if [ -n "$app_name" ]; then
-        echo "$app_name|$desktop_file" >> "$temp_file"
+        apps_list="${apps_list}${app_name}|${desktop_file}\n"
       fi
     fi
   done < <(find "$apps_dir" -name "lgtv-*.desktop" -print0 2>/dev/null)
   
-  if [ ! -s "$temp_file" ]; then
-    rm -f "$temp_file"
+  if [ -z "$apps_list" ]; then
     return 1
   fi
   
   # Use fzf to select app (show name, return full line)
-  local selected=$(cat "$temp_file" | fzf --prompt="Select TV App to Remove: " --height=15 --reverse --border --delimiter='|' --with-nth=1)
-  
-  rm -f "$temp_file"
+  local selected=$(echo -e "$apps_list" | fzf --prompt="Select TV App to Remove: " --height=15 --reverse --border --delimiter='|' --with-nth=1)
   
   if [ -n "$selected" ]; then
     echo "$selected"
