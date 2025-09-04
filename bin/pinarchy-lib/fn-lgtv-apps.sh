@@ -16,7 +16,11 @@ get_tv_apps() {
   fi
   
   # Extract title and id, filter visible apps only, create fzf format
-  echo "$apps_json" | jq -r '.[] | select(.visible == true) | "\(.title) | \(.id)"' | sort | fzf --prompt="Select TV App: " --height=15 --reverse --border
+  local apps_list=$(echo "$apps_json" | jq -r '.[] | select(.visible == true) | "\(.title) | \(.id)"' | sort)
+  echo "DEBUG: apps_list = '$apps_list'" >&2
+  local fzf_result=$(echo "$apps_list" | fzf --prompt="Select TV App: " --height=15 --reverse --border)
+  echo "DEBUG: fzf_result = '$fzf_result'" >&2
+  echo "$fzf_result"
   
   return $?
 }
@@ -29,6 +33,8 @@ add_tv_app() {
   
   # Get selected app using fzf
   local selected_app=$(get_tv_apps "$tv_ip")
+  
+  echo "DEBUG: selected_app = '$selected_app'" >&2
   
   if [ -z "$selected_app" ]; then
     echo "❌ No app selected or failed to get apps"
