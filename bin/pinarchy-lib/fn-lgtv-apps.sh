@@ -48,7 +48,7 @@ add_tv_app() {
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=$tv_name - $app_title
+Name=$app_title
 Comment=Launch $app_title on $tv_name TV
 Exec=pinarchy-cmd-lgtv-launch $tv_ip $app_id
 Icon=tv
@@ -57,10 +57,74 @@ Categories=AudioVideo;TV;
 StartupNotify=false
 EOF
   
+  # Track installed app
+  local tvapps_file="$HOME/.config/lgtv/tvapps"
+  echo "${app_title}:${app_id}:${desktop_file}" >> "$tvapps_file"
+  
   echo "✅ TV app launcher created!"
   echo "   App: $app_title"
   echo "   Desktop file: $desktop_file"
-  echo "   You can now find '$tv_name - $app_title' in your application launcher"
+  echo "   You can now find '$app_title' in your application launcher"
+  
+  return 0
+}
+
+get_installed_tvapps() {
+  local tvapps_file="$HOME/.config/lgtv/tvapps"
+  
+  echo "📱 Select installed TV app to remove:"
+  
+  # Read file and create fzf format (show only title, but return full line for processing)
+  local temp_file=$(mktemp)
+  cat "$tvapps_file" > "$temp_file"
+  
+  # Create display format (just title) but track line numbers
+  local selected_line=$(cat "$temp_file" | nl -nln | while read -r line_num line_content; do
+    local title=$(echo "$line_content" | cut -d':' -f1)
+    echo "$title|$line_num"
+  done | fzf --prompt="Select TV App to Remove: " --height=15 --reverse --border --delimiter='|' --with-nth=1 | cut -d'|' -f2)
+  
+  if [ -n "$selected_line" ]; then
+    sed -n "${selected_line}p" "$temp_file"
+  fi
+  
+  rm -f "$temp_file"
+  
+  return $?
+}
+
+remove_tvapp() {
+  local selected_app=$(get_installed_tvapps)
+  
+  if [ -z "$selected_app" ]; then
+    echo "❌ No app selected"
+    return 1
+  fi
+  
+  # Parse the selected app (format: "title:app_id:desktop_file")
+  local app_title=$(echo "$selected_app" | cut -d':' -f1)
+  local app_id=$(echo "$selected_app" | cut -d':' -f2)
+  local desktop_file=$(echo "$selected_app" | cut -d':' -f3)
+  
+  echo "🗑️ Removing TV app: $app_title"
+  
+  # Remove desktop file if it exists
+  if [ -f "$desktop_file" ]; then
+    rm "$desktop_file"
+    echo "✅ Desktop file removed: $desktop_file"
+  else
+    echo "⚠️ Desktop file not found: $desktop_file"
+  fi
+  
+  # Remove from tracking file
+  local tvapps_file="$HOME/.config/lgtv/tvapps"
+  local temp_file="${tvapps_file}.tmp"
+  
+  # Create temp file without the selected line
+  grep -v "^${app_title}:${app_id}:${desktop_file}$" "$tvapps_file" > "$temp_file" || true
+  mv "$temp_file" "$tvapps_file"
+  
+  echo "✅ TV app '$app_title' removed successfully"
   
   return 0
 }
