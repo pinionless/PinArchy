@@ -5,13 +5,13 @@ set -e
 get_tv_apps() {
   local tv_ip="$1"
   
-  echo "📱 Getting available apps from TV at $tv_ip..."
+  echo "📱 Getting available apps from TV at $tv_ip..." >&2
   
   # Get all apps from TV
   local apps_json=$(bscpylgtvcommand "$tv_ip" get_apps_all true -p "$HOME/.config/lgtv/bscpylgtv.sqlite" 2>/dev/null)
   
   if [ -z "$apps_json" ]; then
-    echo "❌ Failed to get apps from TV. Make sure TV is on and connected."
+    echo "❌ Failed to get apps from TV. Make sure TV is on and connected." >&2
     return 1
   fi
   

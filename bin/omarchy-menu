@@ -322,7 +322,7 @@ show_remove_menu() {
 
 
 
-  case $(menu "Remove" "") in
+  case $(menu "Remove" "$options") in
   *Package*) terminal omarchy-pkg-remove ;;
   *Web*) present_terminal omarchy-webapp-remove ;;
   *TV*) present_terminal pinarchy-remove-tvapp ;;
