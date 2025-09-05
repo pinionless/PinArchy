@@ -1,0 +1,57 @@
+#!/bin/bash
+
+# FIDO2 Security Key Removal Functions
+# Integration with pinarchy-remove-fido2 for security component
+
+CONFIG_DIR="/etc/fido2/security"
+
+get_security_keys() {
+  local keys_file="$CONFIG_DIR/registered-keys"
+  
+  FILTERED_KEYS=()
+  DISPLAY_KEYS=()
+  
+  if [ ! -f "$keys_file" ] || [ ! -s "$keys_file" ]; then
+    return 0
+  fi
+  
+  while IFS=: read -r name vendor_id product_id; do
+    # Format: keyname:vendor_id:product_id:timestamp
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    local key_data="${name}:${vendor_id}:${product_id}:${timestamp}"
+    local display_key="$name (${vendor_id}:${product_id})"
+    
+    FILTERED_KEYS+=("$key_data")
+    DISPLAY_KEYS+=("$display_key")
+  done < "$keys_file"
+}
+
+remove_security_keys() {
+  local selected_keys=("$@")
+  local keys_file="$CONFIG_DIR/registered-keys"
+  
+  if [ ! -f "$keys_file" ]; then
+    echo "❌ No security keys file found"
+    return 1
+  fi
+  
+  echo "🗑️ Removing security keys..."
+  
+  for key_data in "${selected_keys[@]}"; do
+    local keyname=$(echo "$key_data" | cut -d: -f1)
+    
+    # Remove key from file
+    sudo grep -v "^${keyname}:" "$keys_file" > /tmp/keys_temp 2>/dev/null || true
+    sudo mv /tmp/keys_temp "$keys_file" 2>/dev/null || true
+    
+    echo "  ✅ Removed security key: $keyname"
+  done
+  
+  # Source the main security script to use generate_udev_rules function
+  source "$(dirname "$0")/../pinarchy-security-fido2"
+  
+  # Regenerate udev rules after removal
+  generate_udev_rules
+  
+  echo "🔄 Udev rules updated"
+}

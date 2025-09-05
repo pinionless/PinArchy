@@ -428,5 +428,7 @@ create_config_dir
 # Load current configuration
 load_current_config
 
-# Run main menu
-main_menu
+# Run main menu only when script is executed directly (not sourced)
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  main_menu
+fi

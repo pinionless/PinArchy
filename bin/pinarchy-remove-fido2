@@ -14,6 +14,7 @@ COMPONENTS=(
   "login"
   "ssh" 
   "luks"
+  "security"
 )
 
 # Single-select component choice
@@ -29,10 +30,11 @@ echo "Selected component: $SELECTED_COMPONENT"
 echo
 
 # Source component functions
-source "$(dirname "$0")/pinarchy-remove-fido2-sudo"
-source "$(dirname "$0")/pinarchy-remove-fido2-login"
-source "$(dirname "$0")/pinarchy-remove-fido2-ssh"
-source "$(dirname "$0")/pinarchy-remove-fido2-luks"
+source "$(dirname "$0")/pinarchy-lib/fn-remove-fido2-sudo"
+source "$(dirname "$0")/pinarchy-lib/fn-remove-fido2-login"
+source "$(dirname "$0")/pinarchy-lib/fn-remove-fido2-ssh"
+source "$(dirname "$0")/pinarchy-lib/fn-remove-fido2-luks"
+source "$(dirname "$0")/pinarchy-lib/fn-remove-fido2-security"
 
 # Function to get keys for selected component
 get_component_keys() {
@@ -50,6 +52,9 @@ get_component_keys() {
       ;;
     "luks")
       get_luks_keys
+      ;;
+    "security")
+      get_security_keys
       ;;
     *)
       echo "Unknown component: $component"
@@ -147,6 +152,9 @@ case "$SELECTED_COMPONENT" in
     ;;
   "luks")
     remove_luks_keys "${SELECTED_KEYS[@]}"
+    ;;
+  "security")
+    remove_security_keys "${SELECTED_KEYS[@]}"
     ;;
   *)
     echo "Unknown component: $SELECTED_COMPONENT"

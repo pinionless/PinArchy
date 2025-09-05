@@ -27,6 +27,7 @@ COMPONENTS=(
   "login"
   "ssh"
   "luks"
+  "security"
 )
 
 # Use gum for consistent multi-select interface
@@ -63,6 +64,7 @@ for component in "${SELECTED[@]}"; do
     "login") echo "  🔑 login - Console/system login authentication" ;;
     "ssh") echo "  🔗 ssh - Hardware-backed SSH keys" ;;
     "luks") echo "  💾 luks - Disk encryption with FIDO2" ;;
+    "security") echo "  🔒 security - Register key for automated lock/shutdown" ;;
   esac
 done
 
@@ -89,13 +91,22 @@ fi
 echo
 
 # Source component functions
-source "$(dirname "$0")/pinarchy-setup-fido2-sudo"
-source "$(dirname "$0")/pinarchy-setup-fido2-login"
-source "$(dirname "$0")/pinarchy-setup-fido2-ssh"
-source "$(dirname "$0")/pinarchy-setup-fido2-luks"
+source "$(dirname "$0")/pinarchy-lib/fn-setup-fido2-sudo"
+source "$(dirname "$0")/pinarchy-lib/fn-setup-fido2-login"
+source "$(dirname "$0")/pinarchy-lib/fn-setup-fido2-ssh"
+source "$(dirname "$0")/pinarchy-lib/fn-setup-fido2-luks"
+source "$(dirname "$0")/pinarchy-security-fido2"
 
 # Process selected components
 process_sudo_component
 process_login_component
 process_ssh_component
 process_luks_component
+
+# Process security component
+if [[ " ${SELECTED[@]} " =~ " security " ]]; then
+  echo "🔒 Adding security key..."
+  echo
+  create_config_dir
+  add_fido2_key
+fi
