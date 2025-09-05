@@ -17,6 +17,7 @@ Completed tickets should be marked and moved to completed section.
 - 🔴 [TICKET-019](./TICKET-019-limine-multi-boot-menu.md) - Limine Multi-Boot Menu Integration
 
 ## Completed Tickets
+- 🟢 [TICKET-024](./TICKET-024-fix-fido2-setup-security-pin-prompts.md) - Fix FIDO2 Setup - Skip PIN/Touch Prompts for Security Component Only
 - 🟢 [TICKET-017](./TICKET-017-fido2-security-automation.md) - FIDO2 Security Automation
 - 🟢 [TICKET-016](./TICKET-016-improve-starship-color-contrast.md) - Improve Starship Color Contrast
 - 🟢 [TICKET-018](./TICKET-018-tv-management-lg.md) - TV Management for LG TVs

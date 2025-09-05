@@ -8,19 +8,6 @@ set -e
 echo "🔐 PinArchy FIDO2 Management"
 echo
 
-check_fido2_hardware() {
-  local tokens=$(fido2-token -L 2>/dev/null)
-  if [ -z "$tokens" ]; then
-    echo "❌ No FIDO2 device detected. Please plug it in (you may need to unlock it as well)."
-    return 1
-  fi
-  
-  echo "✅ FIDO2 device(s) detected:"
-  echo "$tokens"
-  
-  return 0
-}
-
 # Define available FIDO2 components
 COMPONENTS=(
   "sudo"
@@ -44,17 +31,22 @@ if [[ ${#SELECTED[@]} -eq 0 ]]; then
   exit 0
 fi
 
-echo
-echo "Authentication options:"
+# Skip authentication options prompt for security-only setup
+if [[ ${#SELECTED[@]} -eq 1 && "${SELECTED[0]}" == "security" ]]; then
+  OPTIONS=()
+else
+  echo
+  echo "Authentication options:"
 
-# Separate checkboxes for authentication requirements
-OPTIONS_STRING=$(gum choose --no-limit --header "Select authentication requirements..." --selected-prefix="✓ " "touch-required" "pin-required")
+  # Separate checkboxes for authentication requirements
+  OPTIONS_STRING=$(gum choose --no-limit --header "Select authentication requirements..." --selected-prefix="✓ " "touch-required" "pin-required")
 
-# Convert options to array
-OPTIONS=()
-while IFS= read -r line; do
-  [[ -n "$line" ]] && OPTIONS+=("$line")
-done <<< "$OPTIONS_STRING"
+  # Convert options to array
+  OPTIONS=()
+  while IFS= read -r line; do
+    [[ -n "$line" ]] && OPTIONS+=("$line")
+  done <<< "$OPTIONS_STRING"
+fi
 
 echo
 echo "Selected components:"
@@ -68,24 +60,22 @@ for component in "${SELECTED[@]}"; do
   esac
 done
 
-echo
-echo "Authentication requirements:"
-for option in "${OPTIONS[@]}"; do
-  case "$option" in
-    "touch-required") echo "  👆 touch-required - Physical touch needed for authentication" ;;
-    "pin-required") echo "  🔢 pin-required - PIN entry required for authentication" ;;
-  esac
-done
+# Skip authentication requirements for security-only setup
+if [[ ${#SELECTED[@]} -eq 1 && "${SELECTED[0]}" == "security" ]]; then
+  :
+else
+  echo
+  echo "Authentication requirements:"
+  for option in "${OPTIONS[@]}"; do
+    case "$option" in
+      "touch-required") echo "  👆 touch-required - Physical touch needed for authentication" ;;
+      "pin-required") echo "  🔢 pin-required - PIN entry required for authentication" ;;
+    esac
+  done
 
-if [[ ${#OPTIONS[@]} -eq 0 ]]; then
-  echo "  ⚡ No additional requirements - Presence-only authentication"
-fi
-
-echo
-
-# Check for FIDO2 hardware before proceeding
-if ! check_fido2_hardware; then
-  exit 1
+  if [[ ${#OPTIONS[@]} -eq 0 ]]; then
+    echo "  ⚡ No additional requirements - Presence-only authentication"
+  fi
 fi
 
 echo

@@ -11,19 +11,6 @@ echo
 CONFIG_DIR="/etc/fido2/security"
 CONFIG_FILE="$CONFIG_DIR/config.json"
 
-check_fido2_hardware() {
-  local tokens=$(fido2-token -L 2>/dev/null)
-  if [ -z "$tokens" ]; then
-    echo "❌ No FIDO2 device detected. Please plug it in (you may need to unlock it as well)."
-    return 1
-  fi
-  
-  echo "✅ FIDO2 device(s) detected:"
-  echo "$tokens"
-  
-  return 0
-}
-
 create_config_dir() {
   if [ ! -d "$CONFIG_DIR" ]; then
     echo "📁 Creating configuration directory..."
@@ -414,13 +401,6 @@ if ! command -v jq >/dev/null 2>&1; then
   echo "❌ jq is required but not installed. Please install it first."
   exit 1
 fi
-
-# Check for FIDO2 hardware
-if ! check_fido2_hardware; then
-  exit 1
-fi
-
-echo
 
 # Create config directory
 create_config_dir
