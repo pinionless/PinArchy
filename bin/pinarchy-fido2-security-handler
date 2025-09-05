@@ -1,0 +1,165 @@
+#!/bin/bash
+
+# FIDO2 Security Handler - Called by udev rules
+# Handles FIDO2 device connection/disconnection events
+
+ACTION="$1"
+DEVICE="$2"
+
+CONFIG_DIR="/etc/fido2/security"
+CONFIG_FILE="$CONFIG_DIR/config.json"
+STATE_FILE="$CONFIG_DIR/device-state"
+LOG_FILE="/var/log/fido2-security.log"
+
+# Ensure directories exist
+[ ! -d "$CONFIG_DIR" ] && mkdir -p "$CONFIG_DIR"
+
+# Logging function
+log_event() {
+  local message="$1"
+  local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+  echo "[$timestamp] $message" | tee -a "$LOG_FILE"
+}
+
+# Check if configuration exists and is enabled
+check_config() {
+  if [ ! -f "$CONFIG_FILE" ]; then
+    log_event "No configuration file found, exiting"
+    exit 0
+  fi
+  
+  # Check if any security features are enabled
+  local auto_lock=$(jq -r '.auto_lock.enabled // false' "$CONFIG_FILE" 2>/dev/null)
+  local auto_shutdown=$(jq -r '.auto_shutdown.enabled // false' "$CONFIG_FILE" 2>/dev/null)
+  
+  if [ "$auto_lock" != "true" ] && [ "$auto_shutdown" != "true" ]; then
+    log_event "No security features enabled, exiting"
+    exit 0
+  fi
+}
+
+# Update device state
+update_device_state() {
+  local action="$1"
+  local device="$2"
+  local timestamp=$(date '+%s')
+  
+  if [ "$action" = "add" ]; then
+    echo "${timestamp}:${device}:connected" >> "$STATE_FILE"
+    log_event "FIDO2 device connected: $device"
+  else
+    echo "${timestamp}:${device}:disconnected" >> "$STATE_FILE"
+    log_event "FIDO2 device disconnected: $device"
+  fi
+  
+  # Keep only last 100 entries
+  tail -n 100 "$STATE_FILE" > "$STATE_FILE.tmp" && mv "$STATE_FILE.tmp" "$STATE_FILE"
+}
+
+# Check if any registered FIDO2 devices are currently connected
+check_fido2_devices() {
+  local keys_file="$CONFIG_DIR/registered-keys"
+  if [ ! -f "$keys_file" ] || [ ! -s "$keys_file" ]; then
+    # No registered keys - return false
+    return 1
+  fi
+  
+  # Check if any registered devices are connected via lsusb
+  while IFS=: read -r name vendor_id product_id; do
+    if lsusb -d "${vendor_id}:${product_id}" >/dev/null 2>&1; then
+      return 0
+    fi
+  done < "$keys_file"
+  
+  return 1
+}
+
+# Execute security action with grace period
+execute_security_action() {
+  local action_type="$1"
+  local grace_period="$2"
+  
+  if [ "$grace_period" -gt 0 ]; then
+    log_event "Starting ${grace_period}s grace period for $action_type"
+    sleep "$grace_period"
+    
+    # Check if device was reconnected during grace period
+    if check_fido2_devices; then
+      log_event "FIDO2 device reconnected during grace period, cancelling $action_type"
+      return 0
+    fi
+  fi
+  
+  case "$action_type" in
+    "lock")
+      log_event "Executing screen lock"
+      # Find the user session and lock screen
+      local user_session=$(who | grep ':0' | awk '{print $1}' | head -1)
+      if [ -n "$user_session" ]; then
+        sudo -u "$user_session" DISPLAY=:0 omarchy-lock-screen &
+      fi
+      ;;
+    "shutdown")
+      local shutdown_type="$3"
+      log_event "Executing $shutdown_type shutdown"
+      if [ "$shutdown_type" = "forced" ]; then
+        systemctl poweroff --force --no-wall
+      else
+        systemctl poweroff
+      fi
+      ;;
+  esac
+}
+
+# Handle shutdown with wait period
+handle_shutdown() {
+  local mode=$(jq -r '.auto_shutdown.mode // "immediate"' "$CONFIG_FILE")
+  local wait_time=$(jq -r '.auto_shutdown.wait_time // 60' "$CONFIG_FILE")
+  local shutdown_type=$(jq -r '.auto_shutdown.shutdown_type // "normal"' "$CONFIG_FILE")
+  
+  if [ "$mode" = "wait" ]; then
+    log_event "Waiting ${wait_time}s for device reconnection before shutdown"
+    sleep "$wait_time"
+    
+    # Check if device was reconnected during wait
+    if check_fido2_devices; then
+      log_event "FIDO2 device reconnected during wait period, cancelling shutdown"
+      return 0
+    fi
+  fi
+  
+  execute_security_action "shutdown" 0 "$shutdown_type"
+}
+
+# Main logic
+main() {
+  check_config
+  update_device_state "$ACTION" "$DEVICE"
+  
+  # Only trigger security actions on device removal
+  if [ "$ACTION" = "remove" ]; then
+    # Check if there are any other FIDO2 devices still connected
+    if check_fido2_devices; then
+      log_event "Other FIDO2 devices still connected, no action needed"
+      exit 0
+    fi
+    
+    log_event "No FIDO2 devices connected, checking security actions"
+    
+    # Check auto-lock configuration
+    local auto_lock_enabled=$(jq -r '.auto_lock.enabled // false' "$CONFIG_FILE")
+    if [ "$auto_lock_enabled" = "true" ]; then
+      local grace_period=$(jq -r '.auto_lock.grace_period // 5' "$CONFIG_FILE")
+      (execute_security_action "lock" "$grace_period" &)
+    fi
+    
+    # Check auto-shutdown configuration
+    local auto_shutdown_enabled=$(jq -r '.auto_shutdown.enabled // false' "$CONFIG_FILE")
+    if [ "$auto_shutdown_enabled" = "true" ]; then
+      (handle_shutdown &)
+    fi
+  fi
+}
+
+# Run main function in background to avoid blocking udev
+main &

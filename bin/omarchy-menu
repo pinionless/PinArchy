@@ -135,7 +135,7 @@ show_setup_menu() {
   python -c "import bscpylgtv" &>/dev/null && options="$options\n  LG TV"
   [ -f ~/.config/hypr/bindings.conf ] && options="$options\n  Keybindings"
   [ -f ~/.config/hypr/input.conf ] && options="$options\n  Input"
-  options="$options\n󰱔  DNS\n  Config\n󰈷  Fingerprint\n  Fido2"
+  options="$options\n󰱔  DNS\n  Config\n󰈷  Fingerprint\n  Fido2\n󰒃  Security"
 
   case $(menu "Setup" "$options") in
   *Audio*) ghostty --class=Wiremix.ghostty -e wiremix ;;
@@ -156,6 +156,7 @@ show_setup_menu() {
   *Config*) show_setup_config_menu ;;
   *Fingerprint*) present_terminal omarchy-setup-fingerprint ;;
   *Fido2*) present_terminal pinarchy-setup-fido2 ;;
+  *Security*) present_terminal pinarchy-security-fido2 ;;
   *) show_main_menu ;;
   esac
 }

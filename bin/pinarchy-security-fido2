@@ -1,0 +1,432 @@
+#!/bin/bash
+
+set -e
+
+# FIDO2 Security Automation Configuration Script for PinArchy
+# Configures automated security actions when FIDO2 key is disconnected
+
+echo "🔐 PinArchy FIDO2 Security Automation"
+echo
+
+CONFIG_DIR="/etc/fido2/security"
+CONFIG_FILE="$CONFIG_DIR/config.json"
+
+check_fido2_hardware() {
+  local tokens=$(fido2-token -L 2>/dev/null)
+  if [ -z "$tokens" ]; then
+    echo "❌ No FIDO2 device detected. Please plug it in (you may need to unlock it as well)."
+    return 1
+  fi
+  
+  echo "✅ FIDO2 device(s) detected:"
+  echo "$tokens"
+  
+  return 0
+}
+
+create_config_dir() {
+  if [ ! -d "$CONFIG_DIR" ]; then
+    echo "📁 Creating configuration directory..."
+    sudo mkdir -p "$CONFIG_DIR"
+    sudo chmod 755 "$CONFIG_DIR"
+  fi
+}
+
+load_current_config() {
+  if [ -f "$CONFIG_FILE" ]; then
+    AUTO_LOCK_ENABLED=$(jq -r '.auto_lock.enabled // false' "$CONFIG_FILE")
+    AUTO_LOCK_GRACE=$(jq -r '.auto_lock.grace_period // 5' "$CONFIG_FILE")
+    AUTO_SHUTDOWN_ENABLED=$(jq -r '.auto_shutdown.enabled // false' "$CONFIG_FILE")
+    AUTO_SHUTDOWN_MODE=$(jq -r '.auto_shutdown.mode // "wait"' "$CONFIG_FILE")
+    SHUTDOWN_WAIT_TIME=$(jq -r '.auto_shutdown.wait_time // 60' "$CONFIG_FILE")
+    SHUTDOWN_TYPE=$(jq -r '.auto_shutdown.shutdown_type // "normal"' "$CONFIG_FILE")
+  else
+    # Default values
+    AUTO_LOCK_ENABLED="false"
+    AUTO_LOCK_GRACE="5"
+    AUTO_SHUTDOWN_ENABLED="false"
+    AUTO_SHUTDOWN_MODE="wait"
+    SHUTDOWN_WAIT_TIME="60"
+    SHUTDOWN_TYPE="normal"
+  fi
+}
+
+save_config() {
+  local config=$(cat <<EOF
+{
+  "auto_lock": {
+    "enabled": $AUTO_LOCK_ENABLED,
+    "grace_period": $AUTO_LOCK_GRACE
+  },
+  "auto_shutdown": {
+    "enabled": $AUTO_SHUTDOWN_ENABLED,
+    "mode": "$AUTO_SHUTDOWN_MODE",
+    "wait_time": $SHUTDOWN_WAIT_TIME,
+    "shutdown_type": "$SHUTDOWN_TYPE"
+  }
+}
+EOF
+)
+  echo "$config" | sudo tee "$CONFIG_FILE" > /dev/null
+  sudo chmod 644 "$CONFIG_FILE"
+  echo "💾 Configuration saved"
+}
+
+show_current_config() {
+  echo
+  echo "📋 Current Configuration:"
+  
+  # Show registered devices
+  local keys_file="$CONFIG_DIR/registered-keys"
+  if [ -f "$keys_file" ] && [ -s "$keys_file" ]; then
+    echo "  Registered FIDO2 keys:"
+    while IFS=: read -r name vendor_id product_id; do
+      echo "    🔑 $name (${vendor_id}:${product_id})"
+    done < "$keys_file"
+  else
+    echo "  Registered FIDO2 keys: ❌ None"
+  fi
+  
+  echo "  Auto-lock: $([ "$AUTO_LOCK_ENABLED" = "true" ] && echo "✅ Enabled (${AUTO_LOCK_GRACE}s grace)" || echo "❌ Disabled")"
+  echo "  Auto-shutdown: $([ "$AUTO_SHUTDOWN_ENABLED" = "true" ] && echo "✅ Enabled ($AUTO_SHUTDOWN_MODE mode)" || echo "❌ Disabled")"
+  if [ "$AUTO_SHUTDOWN_ENABLED" = "true" ]; then
+    echo "    Wait time: ${SHUTDOWN_WAIT_TIME} seconds"
+    echo "    Shutdown type: $SHUTDOWN_TYPE"
+  fi
+  echo "  Udev monitoring: $([ -f "/etc/udev/rules.d/99-fido2-security.rules" ] && echo "✅ Active" || echo "❌ No rules installed")"
+  echo
+}
+
+get_usb_device_info() {
+  local device_path="$1"
+  
+  # Extract vendor and product IDs from the device path
+  # Device path format is typically: /dev/hidrawX or similar
+  # We need to find the corresponding USB device
+  
+  local usb_info=""
+  if [ -c "$device_path" ]; then
+    # For character devices like /dev/hidrawX, find the USB device
+    local sys_path="/sys/class/hidraw/$(basename "$device_path")/device"
+    if [ -d "$sys_path" ]; then
+      # Walk up to find USB device
+      local current="$sys_path"
+      while [ "$current" != "/" ] && [ "$current" != "/sys" ]; do
+        if [ -f "$current/idVendor" ] && [ -f "$current/idProduct" ]; then
+          local vendor=$(cat "$current/idVendor")
+          local product=$(cat "$current/idProduct")
+          echo "${vendor}:${product}"
+          return 0
+        fi
+        current="$(dirname "$current")"
+      done
+    fi
+  fi
+  
+  # Fallback: use lsusb to find FIDO2 devices
+  # This is less precise but works for most cases
+  lsusb | grep -i "yubico\|solo\|nitrokey\|feitian\|hypersecu" | head -1 | sed 's/.*ID \([0-9a-f]\{4\}\):\([0-9a-f]\{4\}\).*/\1:\2/'
+}
+
+add_fido2_key() {
+  echo "🔑 Add FIDO2 Security Key"
+  echo
+  
+  # Get list of available FIDO2 tokens
+  local tokens=$(fido2-token -L 2>/dev/null)
+  if [ -z "$tokens" ]; then
+    echo "❌ No FIDO2 devices detected. Please plug in your security key."
+    read -p "Press Enter to continue..."
+    return 0
+  fi
+  
+  echo "✅ Available FIDO2 devices:"
+  echo "$tokens"
+  echo
+  
+  # Parse tokens and create selection list
+  local device_list=()
+  local device_paths=()
+  
+  while IFS= read -r line; do
+    if [ -n "$line" ]; then
+      device_paths+=("$line")
+      # Get USB device info
+      local usb_info=$(get_usb_device_info "$line")
+      if [ -n "$usb_info" ]; then
+        device_list+=("$line ($usb_info)")
+      else
+        device_list+=("$line")
+      fi
+    fi
+  done <<< "$tokens"
+  
+  if [ ${#device_list[@]} -eq 0 ]; then
+    echo "❌ No valid FIDO2 devices found"
+    read -p "Press Enter to continue..."
+    return 0
+  fi
+  
+  # Let user select device
+  echo "Select FIDO2 device to register:"
+  local selected_device=$(printf '%s\n' "${device_list[@]}" | gum choose)
+  
+  if [ -z "$selected_device" ]; then
+    echo "❌ No device selected"
+    return 0
+  fi
+  
+  # Find the corresponding device path
+  local selected_index=-1
+  for i in "${!device_list[@]}"; do
+    if [ "${device_list[$i]}" = "$selected_device" ]; then
+      selected_index=$i
+      break
+    fi
+  done
+  
+  if [ $selected_index -eq -1 ]; then
+    echo "❌ Device selection error"
+    read -p "Press Enter to continue..."
+    return 0
+  fi
+  
+  local device_path="${device_paths[$selected_index]}"
+  echo
+  echo "Selected device: $device_path"
+  
+  # Get USB vendor/product IDs
+  local usb_info=$(get_usb_device_info "$device_path")
+  if [ -z "$usb_info" ]; then
+    echo "❌ Could not determine USB vendor/product ID for device"
+    read -p "Press Enter to continue..."
+    return 0
+  fi
+  
+  local vendor_id=$(echo "$usb_info" | cut -d: -f1)
+  local product_id=$(echo "$usb_info" | cut -d: -f2)
+  
+  echo "Device USB ID: $vendor_id:$product_id"
+  echo
+  
+  # Get friendly name from user
+  local key_name=$(gum input --placeholder "My Security Key" --prompt "Enter a name for this key: ")
+  if [ -z "$key_name" ]; then
+    key_name="FIDO2 Key"
+  fi
+  
+  # Save to registered keys file
+  local keys_file="$CONFIG_DIR/registered-keys"
+  echo "${key_name}:${vendor_id}:${product_id}" | sudo tee -a "$keys_file" > /dev/null
+  
+  echo "✅ Key registered: $key_name ($vendor_id:$product_id)"
+  echo
+  
+  # Generate and install udev rules
+  generate_udev_rules
+}
+
+remove_fido2_key() {
+  echo "🗑️ Remove FIDO2 Security Key"
+  echo
+  
+  local keys_file="$CONFIG_DIR/registered-keys"
+  if [ ! -f "$keys_file" ] || [ ! -s "$keys_file" ]; then
+    echo "❌ No registered keys found"
+    read -p "Press Enter to continue..."
+    return 0
+  fi
+  
+  # Show registered keys
+  local key_list=()
+  while IFS=: read -r name vendor_id product_id; do
+    key_list+=("$name (${vendor_id}:${product_id})")
+  done < "$keys_file"
+  
+  if [ ${#key_list[@]} -eq 0 ]; then
+    echo "❌ No registered keys found"
+    read -p "Press Enter to continue..."
+    return 0
+  fi
+  
+  echo "Select key to remove:"
+  local selected_key=$(printf '%s\n' "${key_list[@]}" | gum choose)
+  
+  if [ -z "$selected_key" ]; then
+    echo "❌ No key selected"
+    return 0
+  fi
+  
+  # Extract the name from selection
+  local key_name=$(echo "$selected_key" | sed 's/ (.*//')
+  
+  # Remove from file
+  sudo grep -v "^${key_name}:" "$keys_file" > /tmp/keys_temp && sudo mv /tmp/keys_temp "$keys_file"
+  
+  echo "✅ Key removed: $key_name"
+  echo
+  
+  # Regenerate udev rules
+  generate_udev_rules
+}
+
+generate_udev_rules() {
+  echo "📝 Generating udev rules..."
+  
+  local keys_file="$CONFIG_DIR/registered-keys"
+  local rules_file="/etc/udev/rules.d/99-fido2-security.rules"
+  
+  # Create rules header
+  local rules_content=$(cat <<'EOF'
+# FIDO2 Security Automation udev rules
+# Generated by pinarchy-security-fido2
+# Triggers security actions when registered FIDO2 devices are connected/disconnected
+
+EOF
+)
+  
+  if [ -f "$keys_file" ] && [ -s "$keys_file" ]; then
+    while IFS=: read -r name vendor_id product_id; do
+      rules_content+="\n# $name"
+      rules_content+="\nSUBSYSTEM==\"usb\", ATTR{idVendor}==\"$vendor_id\", ATTR{idProduct}==\"$product_id\", ACTION==\"add\", RUN+=\"/usr/local/bin/pinarchy-fido2-security-handler add %k\""
+      rules_content+="\nSUBSYSTEM==\"usb\", ATTR{idVendor}==\"$vendor_id\", ATTR{idProduct}==\"$product_id\", ACTION==\"remove\", RUN+=\"/usr/local/bin/pinarchy-fido2-security-handler remove %k\""
+      rules_content+="\n"
+    done < "$keys_file"
+    
+    # Write rules file
+    echo -e "$rules_content" | sudo tee "$rules_file" > /dev/null
+    sudo udevadm control --reload-rules
+    echo "✅ Udev rules generated and installed"
+  else
+    # Remove rules file if no keys registered
+    sudo rm -f "$rules_file"
+    echo "🗑️ No registered keys - udev rules removed"
+  fi
+}
+
+configure_auto_lock() {
+  echo "🔒 Configure Auto-Lock"
+  echo
+  
+  if gum confirm "Enable auto-lock when FIDO2 key is disconnected?"; then
+    AUTO_LOCK_ENABLED="true"
+    echo
+    AUTO_LOCK_GRACE=$(gum input --placeholder "5" --prompt "Grace period before lock (0-60 seconds): ")
+    
+    # Validate grace period
+    if ! [[ "$AUTO_LOCK_GRACE" =~ ^[0-9]+$ ]] || [ "$AUTO_LOCK_GRACE" -lt 0 ] || [ "$AUTO_LOCK_GRACE" -gt 60 ]; then
+      echo "❌ Invalid grace period. Using default: 5 seconds"
+      AUTO_LOCK_GRACE="5"
+    fi
+    
+    echo "✅ Auto-lock enabled with ${AUTO_LOCK_GRACE}s grace period"
+  else
+    AUTO_LOCK_ENABLED="false"
+    echo "❌ Auto-lock disabled"
+  fi
+}
+
+configure_auto_shutdown() {
+  echo
+  echo "⚡ Configure Auto-Shutdown"
+  echo
+  
+  if gum confirm "Enable auto-shutdown when FIDO2 key is disconnected?"; then
+    AUTO_SHUTDOWN_ENABLED="true"
+    echo
+    
+    # Choose shutdown mode
+    AUTO_SHUTDOWN_MODE=$(gum choose --header "Shutdown behavior:" "immediate" "wait")
+    
+    if [ "$AUTO_SHUTDOWN_MODE" = "wait" ]; then
+      echo
+      SHUTDOWN_WAIT_TIME=$(gum input --placeholder "60" --prompt "Wait time for key reconnection (60-300 seconds): ")
+      
+      # Validate wait time
+      if ! [[ "$SHUTDOWN_WAIT_TIME" =~ ^[0-9]+$ ]] || [ "$SHUTDOWN_WAIT_TIME" -lt 60 ] || [ "$SHUTDOWN_WAIT_TIME" -gt 300 ]; then
+        echo "❌ Invalid wait time. Using default: 60 seconds"
+        SHUTDOWN_WAIT_TIME="60"
+      fi
+    fi
+    
+    echo
+    SHUTDOWN_TYPE=$(gum choose --header "Shutdown type:" "normal" "forced")
+    
+    echo "✅ Auto-shutdown enabled:"
+    echo "  Mode: $AUTO_SHUTDOWN_MODE"
+    [ "$AUTO_SHUTDOWN_MODE" = "wait" ] && echo "  Wait time: ${SHUTDOWN_WAIT_TIME}s"
+    echo "  Type: $SHUTDOWN_TYPE"
+  else
+    AUTO_SHUTDOWN_ENABLED="false"
+    echo "❌ Auto-shutdown disabled"
+  fi
+}
+
+
+main_menu() {
+  while true; do
+    show_current_config
+    
+    local choice=$(gum choose --header "FIDO2 Security Configuration:" \
+      "Add FIDO2 Key" \
+      "Remove FIDO2 Key" \
+      "Configure Auto-Lock" \
+      "Configure Auto-Shutdown" \
+      "Save & Exit" \
+      "Exit without Saving")
+    
+    case "$choice" in
+      "Add FIDO2 Key")
+        add_fido2_key
+        ;;
+      "Remove FIDO2 Key")
+        remove_fido2_key
+        ;;
+      "Configure Auto-Lock")
+        configure_auto_lock
+        ;;
+      "Configure Auto-Shutdown")
+        configure_auto_shutdown
+        ;;
+      "Save & Exit")
+        save_config
+        echo "✅ Configuration complete!"
+        break
+        ;;
+      "Exit without Saving")
+        echo "❌ Exiting without saving changes"
+        break
+        ;;
+    esac
+    
+    echo
+    sleep 1
+  done
+}
+
+# Check dependencies
+if ! command -v gum >/dev/null 2>&1; then
+  echo "❌ gum is required but not installed. Please install it first."
+  exit 1
+fi
+
+if ! command -v jq >/dev/null 2>&1; then
+  echo "❌ jq is required but not installed. Please install it first."
+  exit 1
+fi
+
+# Check for FIDO2 hardware
+if ! check_fido2_hardware; then
+  exit 1
+fi
+
+echo
+
+# Create config directory
+create_config_dir
+
+# Load current configuration
+load_current_config
+
+# Run main menu
+main_menu
