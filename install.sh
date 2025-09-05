@@ -51,6 +51,9 @@ source $OMARCHY_INSTALL/config/hardware/nvidia.sh
 source $OMARCHY_INSTALL/config/hardware/fix-f13-amd-audio-input.sh
 source $OMARCHY_INSTALL/config/hardware/lgtv.sh
 
+# System
+source $OMARCHY_INSTALL/system/hibernation.sh
+
 # Login
 source $OMARCHY_INSTALL/login/plymouth.sh
 source $OMARCHY_INSTALL/login/limine-snapper.sh

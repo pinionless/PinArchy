@@ -8,7 +8,7 @@ hibernation with swapfile in a subvolume
 A: create subvolume than swapfile
 
 **Q: Subvolume specifics - Should the swapfile be in the root subvolume (@) or a dedicated subvolume (like @swap)?**
-A: research this later
+A: Create top-level @swapfile subvolume (next to @root/@home, not nested inside them)
 
 **Q: Hibernation scope - Are you looking for just the swapfile setup for hibernation, full hibernation configuration including kernel parameters, or integration with your existing FIDO2/LUKS setup?**
 A: full hibernation research and implementation

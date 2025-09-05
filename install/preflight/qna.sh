@@ -10,4 +10,8 @@ echo
 read -p "Install LG TV management tools? (y/N) [N]: " PINARCHY_LG_TV
 export PINARCHY_LG_TV="${PINARCHY_LG_TV:-N}"
 
+# Hibernation setup
+read -p "Setup hibernation with swapfile in Btrfs subvolume? (y/N) [N]: " PINARCHY_HIBERNATION
+export PINARCHY_HIBERNATION="${PINARCHY_HIBERNATION:-N}"
+
 echo "Q&A complete. Proceeding with installation..."
