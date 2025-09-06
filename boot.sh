@@ -30,5 +30,13 @@ if [[ $OMARCHY_REF != "main" ]]; then
   cd -
 fi
 
+# Set up installation logging
+LOG_FILE="$HOME/omarchy-install-$(date +%Y%m%d-%H%M%S).log"
+
+# Redirect all output to both terminal and log file
+exec > >(tee -a "$LOG_FILE")
+exec 2> >(tee -a "$LOG_FILE" >&2)
+
 echo -e "\nInstallation starting..."
+echo "Installation log will be saved to: $LOG_FILE"
 source ~/.local/share/omarchy/install.sh
