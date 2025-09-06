@@ -36,17 +36,50 @@ Implement complete hibernation functionality using a swapfile located within a B
    - Test hibernation/resume functionality
 
 ## Acceptance Criteria
-- [ ] Research completed on Btrfs swapfile best practices
-- [ ] Research completed on CoW implications and solutions  
-- [ ] Btrfs subvolume created for swapfile
-- [ ] Swapfile created with size equal to system RAM
-- [ ] Kernel parameters configured for hibernation
-- [ ] Hibernation works with existing FIDO2/LUKS setup
-- [ ] System successfully hibernates and resumes
-- [ ] Documentation added explaining the implementation
+- [x] Research completed on Btrfs swapfile best practices
+- [x] Research completed on CoW implications and solutions  
+- [x] Btrfs subvolume created for swapfile
+- [x] Swapfile created with size equal to system RAM
+- [x] Kernel parameters configured for hibernation
+- [x] Hibernation works with existing FIDO2/LUKS setup
+- [x] System successfully hibernates and resumes
+- [x] Documentation added explaining the implementation
+
+## Implementation Status
+**COMPLETED** ✅ - Hibernation implementation completed in 3 phases:
+
+### Phase 1: Research & Planning
+- Comprehensive hibernation research documented in `dev/hibernation-research.md`
+- Identified Btrfs-specific requirements and NVIDIA compatibility issues
+- Documented PinArchy system integration requirements
+
+### Phase 2: Core Implementation  
+- Created `install/system/hibernation.sh` script with 3-step implementation:
+  1. **Step 1**: Btrfs swapfile creation with proper top-level `@swapfile` subvolume
+  2. **Step 2**: Kernel configuration (mkinitcpio hooks with `resume` hook)
+  3. **Step 3**: Bootloader configuration (Limine) with resume parameters
+- Added hibernation script to `install.sh` execution pipeline
+- Created migration `1757155150.sh` for existing users
+
+### Phase 3: Integration & Testing
+- Integrated with existing FIDO2/LUKS encryption system
+- Fixed resume parameter format matching for encrypted/non-encrypted systems
+- Tested hibernation and boot functionality successfully
+- Dynamic root device detection from limine config
+
+## Key Features Implemented
+- **Smart Subvolume Creation**: Top-level `@swapfile` subvolume to avoid snapshot conflicts
+- **COW Handling**: Proper Copy-on-Write disabling using `chattr +C`
+- **Btrfs-Specific Tools**: Uses `btrfs inspect-internal map-swapfile` for correct offset calculation
+- **LUKS Integration**: Works with both encrypted and non-encrypted root devices
+- **Limine Integration**: Automatic resume parameter injection into bootloader config
+- **Error Handling**: Comprehensive validation and graceful error handling
 
 ## Priority
-Medium
+~~Medium~~ **COMPLETED**
+
+## Notes
+NVIDIA-specific hibernation features extracted to [TICKET-025](./TICKET-025-nvidia-hibernation-support.md) for future implementation.
 
 ## Status
 Todo
