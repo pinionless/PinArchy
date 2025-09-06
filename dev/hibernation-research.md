@@ -22,7 +22,7 @@ systemctl enable nvidia-suspend-then-hibernate.service
 ### NVIDIA Driver Parameters (2024 Issues)
 ```bash
 # Create/edit /etc/modprobe.d/nvidia.conf
-# Disable GSP firmware (major 2024 hibernation issue with driver 555+)
+# Disable GSP firmware (enabled by default since driver 555, June 2024 - causes hibernation issues)
 options nvidia NVreg_EnableGpuFirmware=0
 
 # Video memory preservation (default in Arch but ensure it's set)
@@ -30,6 +30,9 @@ options nvidia NVreg_PreserveVideoMemoryAllocations=1
 
 # Temporary file path (NOT /tmp - survives reboot)
 options nvidia NVreg_TemporaryFilePath=/var/tmp
+
+# Optional: Blacklist nvidiafb if experiencing hibernation conflicts
+# blacklist nvidiafb
 ```
 
 ### Early KMS Considerations
@@ -71,16 +74,46 @@ NVIDIA_MODULES="nvidia nvidia_modeset nvidia_uvm nvidia_drm"
 
 ### Integration Requirements for Hibernation
 1. **Modify NVIDIA Configuration:** Skip early module loading when hibernation enabled
-2. **Update Limine Configuration:** Add resume parameters to kernel command line  
-3. **Handle Plymouth Compatibility:** Ensure splash screen works with hibernation resume
-4. **FIDO2 Integration:** Hibernation must work with FIDO2 unlock process
-5. **Systemd Service Management:** Enable NVIDIA hibernation services properly
+2. **Update Limine Configuration:** Add resume parameters to kernel command line
+3. **Initramfs Hook Ordering:** Ensure resume hook comes AFTER encrypt hook for LUKS encryption
+4. **Handle Plymouth Compatibility:** Ensure splash screen works with hibernation resume
+5. **FIDO2 Integration:** Hibernation must work with FIDO2 unlock process
+6. **Systemd Service Management:** Enable NVIDIA hibernation services properly
 
 ### Implementation Priority for PinArchy
 - **High:** Resolve NVIDIA early KMS vs hibernation conflict
 - **High:** Integrate with existing limine bootloader setup
 - **Medium:** Ensure FIDO2 unlock works post-hibernation resume
 - **Low:** Plymouth compatibility testing
+
+---
+
+## Modern Hibernation Enhancements (2024+)
+
+### Hibernation Performance Optimization
+Linux 6.9+ supports improved hibernation compression algorithms:
+```bash
+# Set hibernation compression algorithm (better performance)
+echo lz4 > /sys/module/hibernate/parameters/compressor  # Faster decompression
+# Or via kernel parameter: hibernate.compressor=lz4
+
+# Default is LZO, but LZ4 provides faster resume times
+```
+
+### Btrfs-Specific Hibernation Configuration  
+For Btrfs swap files, use the correct offset calculation:
+```bash
+# DO NOT use filefrag for Btrfs - use btrfs inspect-internal instead
+btrfs inspect-internal map-swapfile -r /swapfile
+# Add result to resume_offset= kernel parameter
+```
+
+### UEFI Automatic Hibernation (systemd v255+)
+Modern systems with UEFI can use automatic swap selection:
+- systemd automatically picks suitable swap space
+- Stores hibernation info in HibernateLocation EFI variable
+- No manual resume= parameter needed for UEFI systems
+- Legacy BIOS systems still require manual configuration
 
 ---
 

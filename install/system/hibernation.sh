@@ -477,3 +477,156 @@ else
     echo "Hibernation setup incomplete - manual bootloader configuration required"
     exit 1
 fi
+
+# ------------------------------------------
+# STEP 4: NVIDIA Hibernation Configuration
+# ------------------------------------------
+
+echo -e "\e[32m\n=== STEP 4: NVIDIA Hibernation Configuration ===\e[0m"
+
+# 4.1: NVIDIA Detection
+echo "Checking for NVIDIA GPU..."
+if lspci | grep -i nvidia >/dev/null 2>&1; then
+    echo "NVIDIA GPU detected ✓"
+    
+    # 4.2: NVIDIA Driver Parameters
+    echo "Configuring NVIDIA driver parameters for hibernation..."
+    
+    nvidia_conf="/etc/modprobe.d/nvidia.conf"
+    echo "Updating NVIDIA modprobe configuration: $nvidia_conf"
+    
+    # Create backup if file exists
+    if [[ -f "$nvidia_conf" ]]; then
+        echo "Creating backup: ${nvidia_conf}.backup"
+        sudo cp "$nvidia_conf" "${nvidia_conf}.backup"
+        echo "Existing nvidia.conf found - updating with hibernation parameters"
+    else
+        echo "Creating new nvidia.conf with hibernation parameters"
+    fi
+    
+    # Define hibernation-specific parameters to add
+    hibernation_params=(
+        "options nvidia_drm fbdev=1"
+        "options nvidia NVreg_PreserveVideoMemoryAllocations=1"
+        "options nvidia NVreg_EnableGpuFirmware=0"
+        "options nvidia NVreg_TemporaryFilePath=/var/tmp"
+        "blacklist nouveau"
+    )
+    
+    # Add each parameter if not already present
+    for param in "${hibernation_params[@]}"; do
+        param_key=$(echo "$param" | cut -d' ' -f1-2)
+        if [[ -f "$nvidia_conf" ]] && grep -q "^$param_key" "$nvidia_conf"; then
+            echo "$param_key already configured ✓"
+        else
+            echo "Adding: $param"
+            echo "$param" | sudo tee -a "$nvidia_conf" >/dev/null
+        fi
+    done
+    
+    echo "NVIDIA modprobe configuration updated ✓"
+    
+    # 4.3: NVIDIA Hibernation Services
+    echo "Enabling NVIDIA hibernation services..."
+    
+    # List of NVIDIA hibernation services to enable
+    nvidia_services=(
+        "nvidia-suspend.service"
+        "nvidia-hibernate.service"
+        "nvidia-resume.service"
+        "nvidia-suspend-then-hibernate.service"
+    )
+    
+    for service in "${nvidia_services[@]}"; do
+        if systemctl list-unit-files | grep -q "$service"; then
+            if systemctl is-enabled "$service" >/dev/null 2>&1; then
+                echo "$service is already enabled ✓"
+            else
+                echo "Enabling $service..."
+                sudo systemctl enable "$service"
+                echo "$service enabled ✓"
+            fi
+        else
+            echo -e "\e[33m$service not found (may not be available with current driver)\e[0m"
+        fi
+    done
+    
+    # 4.4: Validation
+    echo "Performing NVIDIA hibernation validation..."
+    
+    # Check /var/tmp space
+    if [[ -d "/var/tmp" ]]; then
+        var_tmp_space=$(df /var/tmp | tail -1 | awk '{print $4}')
+        var_tmp_space_mb=$((var_tmp_space / 1024))
+        echo "/var/tmp available space: ${var_tmp_space_mb} MB"
+        
+        # Get GPU memory info if nvidia-smi is available
+        if command -v nvidia-smi >/dev/null; then
+            gpu_memory=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits | head -1)
+            if [[ -n "$gpu_memory" && "$gpu_memory" =~ ^[0-9]+$ ]]; then
+                echo "GPU memory: ${gpu_memory} MB"
+                
+                if [[ $var_tmp_space_mb -ge $gpu_memory ]]; then
+                    echo "/var/tmp space sufficient for GPU memory ✓"
+                else
+                    echo -e "\e[33m/var/tmp space may be insufficient for GPU memory\e[0m"
+                    echo "Consider freeing space in /var/tmp or monitoring hibernation closely"
+                fi
+            else
+                echo "Could not determine GPU memory size"
+            fi
+        else
+            echo "nvidia-smi not available - cannot check GPU memory size"
+        fi
+    else
+        echo -e "\e[33m/var/tmp directory not found\e[0m"
+        echo "Creating /var/tmp directory..."
+        sudo mkdir -p /var/tmp
+        echo "/var/tmp directory created ✓"
+    fi
+    
+    # Verify NVIDIA hibernation services
+    echo "Verifying NVIDIA hibernation services..."
+    enabled_services=0
+    for service in "${nvidia_services[@]}"; do
+        if systemctl is-enabled "$service" >/dev/null 2>&1; then
+            enabled_services=$((enabled_services + 1))
+        fi
+    done
+    
+    if [[ $enabled_services -gt 0 ]]; then
+        echo "NVIDIA hibernation services enabled: $enabled_services/${#nvidia_services[@]} ✓"
+    else
+        echo -e "\e[33mNo NVIDIA hibernation services were enabled\e[0m"
+        echo "This may be normal if services are not available with current driver version"
+    fi
+    
+    echo -e "\e[32m\nNVIDIA hibernation configuration completed ✓\e[0m"
+    echo -e "\e[33mNOTE: Reboot required for NVIDIA driver parameter changes to take effect\e[0m"
+    
+else
+    echo "No NVIDIA GPU detected - skipping NVIDIA hibernation configuration ✓"
+fi
+
+# ------------------------------------------
+# Hibernation Setup Complete
+# ------------------------------------------
+
+echo -e "\e[32m\n🛏️ Hibernation setup completed successfully! ✓\e[0m"
+echo ""
+echo "Summary:"
+echo "✓ Btrfs swapfile created and configured"
+echo "✓ Kernel hooks configured for hibernation resume"
+echo "✓ Bootloader configured with resume parameters"
+if lspci | grep -i nvidia >/dev/null 2>&1; then
+    echo "✓ NVIDIA hibernation services and parameters configured"
+fi
+echo ""
+echo -e "\e[33m⚠️  IMPORTANT: Reboot required for hibernation to work properly\e[0m"
+echo ""
+echo "After reboot, test hibernation with:"
+echo "  sudo systemctl hibernate"
+echo ""
+echo "Check hibernation status with:"
+echo "  swapon --show"
+echo "  cat /proc/swaps"
