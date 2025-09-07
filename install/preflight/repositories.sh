@@ -1,10 +1,6 @@
 #!/bin/bash
 
-# Install build tools
-sudo pacman -S --needed --noconfirm base-devel
-
-# Configure pacman
-sudo cp -f ~/.local/share/omarchy/default/pacman/pacman.conf /etc/pacman.conf
+# Initialize pacman keyring
 
 # Only add Chaotic-AUR if the architecture is x86_64 so ARM users can build the packages
 if [[ "$(uname -m)" == "x86_64" ]] && [ -z "$DISABLE_CHAOTIC" ]; then
@@ -20,6 +16,12 @@ if [[ "$(uname -m)" == "x86_64" ]] && [ -z "$DISABLE_CHAOTIC" ]; then
     echo -e "Failed to install Chaotic-AUR keyring/mirrorlist, so won't be available!"
   fi
 fi
+
+# Install build tools
+sudo pacman -S --needed --noconfirm base-devel
+
+# Configure pacman
+sudo cp -f ~/.local/share/omarchy/default/pacman/pacman.conf /etc/pacman.conf
 
 # Refresh all repos
 sudo pacman -Syu --noconfirm

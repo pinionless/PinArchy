@@ -5,10 +5,20 @@ set -eE
 
 OMARCHY_PATH="$HOME/.local/share/omarchy"
 OMARCHY_INSTALL="$OMARCHY_PATH/install"
+LOG_FILE="$HOME/omarchy-install-$(date +%Y%m%d-%H%M%S).log"
 export PATH="$OMARCHY_PATH/bin:$PATH"
 
+
+echo "Installation log will be saved to: $LOG_FILE"
+
+# Installation options
+source ~/.local/share/omarchy/install/preflight/qna.sh
+
+# Now redirect all output to both terminal and log file
+exec > >(tee -a "$LOG_FILE")
+exec 2> >(tee -a "$LOG_FILE" >&2)
+
 # Preparation
-source $OMARCHY_INSTALL/preflight/qna.sh
 source $OMARCHY_INSTALL/preflight/show-env.sh
 source $OMARCHY_INSTALL/preflight/trap-errors.sh
 source $OMARCHY_INSTALL/preflight/guard.sh
@@ -51,14 +61,13 @@ source $OMARCHY_INSTALL/config/hardware/nvidia.sh
 source $OMARCHY_INSTALL/config/hardware/fix-f13-amd-audio-input.sh
 source $OMARCHY_INSTALL/config/hardware/lgtv.sh
 
-# System
-source $OMARCHY_INSTALL/system/hibernation.sh
-
 # Login
 source $OMARCHY_INSTALL/login/plymouth.sh
 source $OMARCHY_INSTALL/login/limine-snapper.sh
 source $OMARCHY_INSTALL/login/alt-bootloaders.sh
 
+# System
+source $OMARCHY_INSTALL/system/hibernation.sh
 
 
 # Finishing

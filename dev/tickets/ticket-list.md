@@ -11,7 +11,7 @@ Completed tickets should be marked and moved to completed section.
 ### High Priority
 
 ### Medium Priority
-- 🔴 [TICKET-025](./TICKET-025-nvidia-hibernation-support.md) - NVIDIA Hibernation Support
+- 🟡 [TICKET-025](./TICKET-025-nvidia-hibernation-support.md) - NVIDIA Hibernation Support
 
 ### Low Priority
 - 🔴 [TICKET-019](./TICKET-019-limine-multi-boot-menu.md) - Limine Multi-Boot Menu Integration
