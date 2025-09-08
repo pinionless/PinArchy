@@ -12,10 +12,9 @@ EOF
   fi
 
   if [[ "$ROOT_DEVICE" =~ /dev/mapper/ ]]; then
-    # Strip subvolume notation for lsblk
-    ROOT_DEVICE_CLEAN=$(echo "$ROOT_DEVICE" | sed 's/\[.*\]//')
-    LUKS_PARENT=$(lsblk -no PKNAME "$ROOT_DEVICE_CLEAN")
-    LUKS_UUID=$(sudo cryptsetup luksDump "/dev/$LUKS_PARENT" | grep "UUID:" | awk '{print $2}')
+    ROOT_DEVICE_CLEAN=$(echo "$ROOT_DEVICE" | sed 's/\[.*\]//' | sed 's|/dev/mapper/||')
+    LUKS_PARENT=$(sudo cryptsetup status $ROOT_DEVICE_CLEAN | grep device | awk '{print $2}')
+    LUKS_UUID=$(sudo cryptsetup luksUUID "$LUKS_PARENT")
   fi
 
   if [ -n "${OMARCHY_CHROOT_INSTALL:-}" ]; then
@@ -37,7 +36,7 @@ EOF
   CMDLINE_FALLBACK="rd.luks.name=${LUKS_UUID}=root root=/dev/mapper/root rootflags=subvol=${ROOT_SUBVOL} rw rootfstype=${ROOT_FSTYPE}"
 
   sudo tee /etc/default/limine <<EOF >/dev/null
-TARGET_OS_NAME=$HOST
+TARGET_OS_NAME=$HOSTNAME
 
 ESP_PATH="/boot"
 
@@ -81,7 +80,7 @@ EOF
   fi
 
   # linux.preset customization - move kernel to custom folder, keep microcode in /boot
-  CLEAN_HOST=$(echo "$HOST" | sed 's/[^a-zA-Z0-9]//g')  # Remove special chars
+  CLEAN_HOST=$(echo "$HOSTNAME" | sed 's/[^a-zA-Z0-9]//g')  # Remove special chars
   CUSTOM_BOOT_DIR="/boot/EFI/${CLEAN_HOST}"
 
   # Create custom boot directory
@@ -103,7 +102,7 @@ EOF
   # Update linux.preset paths for kernel and initramfs only
   sudo sed -i "s|ALL_kver=\"/boot/vmlinuz-linux\"|ALL_kver=\"${CUSTOM_BOOT_DIR}/vmlinuz-linux\"|" /etc/mkinitcpio.d/linux.preset
   sudo sed -i "s|default_image=\"/boot/initramfs-linux.img\"|default_image=\"${CUSTOM_BOOT_DIR}/initramfs-linux.img\"|" /etc/mkinitcpio.d/linux.preset  
-  sudo sed -i "s|#fallback_image=\"/boot/initramfs-linux-fallback.img\"|fallback_image=\"${CUSTOM_BOOT_DIR}/initramfs-linux-fallback.img\"|" /etc/mkinitcpio.d/linux.preset
+  sudo sed -i "s|fallback_image=\"/boot/initramfs-linux-fallback.img\"|fallback_image=\"${CUSTOM_BOOT_DIR}/initramfs-linux-fallback.img\"|" /etc/mkinitcpio.d/linux.preset
 
   # Create pacman hook to automate kernel file moves
   sudo mkdir -p /etc/pacman.d/hooks

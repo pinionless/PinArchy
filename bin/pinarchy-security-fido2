@@ -352,6 +352,8 @@ configure_auto_shutdown() {
 
 main_menu() {
   while true; do
+    clear
+    omarchy-show-logo
     show_current_config
     
     local choice=$(gum choose --header "FIDO2 Security Configuration:" \
@@ -359,8 +361,7 @@ main_menu() {
       "Remove FIDO2 Key" \
       "Configure Auto-Lock" \
       "Configure Auto-Shutdown" \
-      "Save & Exit" \
-      "Exit without Saving")
+      "Exit")
     
     case "$choice" in
       "Add FIDO2 Key")
@@ -371,17 +372,14 @@ main_menu() {
         ;;
       "Configure Auto-Lock")
         configure_auto_lock
+        save_config
         ;;
       "Configure Auto-Shutdown")
         configure_auto_shutdown
-        ;;
-      "Save & Exit")
         save_config
-        echo "✅ Configuration complete!"
-        break
         ;;
-      "Exit without Saving")
-        echo "❌ Exiting without saving changes"
+      "Exit")
+        echo "✅ Configuration complete!"
         break
         ;;
     esac

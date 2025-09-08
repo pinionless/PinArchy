@@ -59,6 +59,7 @@ source $OMARCHY_INSTALL/config/hardware/usb-autosuspend.sh
 source $OMARCHY_INSTALL/config/hardware/ignore-power-button.sh
 source $OMARCHY_INSTALL/config/hardware/nvidia.sh
 source $OMARCHY_INSTALL/config/hardware/fix-f13-amd-audio-input.sh
+source $OMARCHY_INSTALL/config/hardware/fido2.sh
 source $OMARCHY_INSTALL/config/hardware/lgtv.sh
 
 # Login

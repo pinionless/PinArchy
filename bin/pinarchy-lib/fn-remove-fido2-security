@@ -48,7 +48,7 @@ remove_security_keys() {
   done
   
   # Source the main security script to use generate_udev_rules function
-  source "$(dirname "$0")/../pinarchy-security-fido2"
+  source "$HOME/.local/share/omarchy/bin/pinarchy-security-fido2"
   
   # Regenerate udev rules after removal
   generate_udev_rules

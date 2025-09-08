@@ -9,7 +9,7 @@
 #
 
 # Install required FIDO2 packages
-sudo pacman -S --noconfirm --needed libfido2 pam-u2f
+sudo pacman -S --noconfirm --needed libfido2 pam-u2f usbutils
 
 # Create FIDO2 configuration directory and prepare separate authfiles for sudo and login:
 # SUDO authfiles:
@@ -78,6 +78,12 @@ account   required pam_unix.so
 password  required pam_unix.so
 session   required pam_unix.so
 EOF
+fi
+
+# Install FIDO2 security handler to system location (required for udev rules)
+if [ -f "$HOME/.local/share/omarchy/bin/pinarchy-lib/pinarchy-fido2-security-handler" ]; then
+    sudo cp "$HOME/.local/share/omarchy/bin/pinarchy-lib/pinarchy-fido2-security-handler" /usr/local/bin/
+    sudo chmod +x /usr/local/bin/pinarchy-fido2-security-handler
 fi
 
 # NOTE: This script only sets up the PAM infrastructure for FIDO2 authentication.

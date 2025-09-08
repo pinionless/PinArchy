@@ -269,7 +269,9 @@ swapon --show
 # 1.6: Add to fstab for persistence
 echo "Configuring fstab for persistence..."
 
+echo "DEBUG: device_root = '$device_root'"
 device_uuid=$(blkid -s UUID -o value "$device_root")
+echo "DEBUG: device_uuid = '$device_uuid'"
 echo "Device UUID: $device_uuid"
 
 # Check if entries already exist and add if missing
@@ -333,7 +335,7 @@ if [[ -f "$hooks_file" ]]; then
             
             # Rebuild initramfs
             echo "Rebuilding initramfs..."
-            sudo mkinitcpio -P
+            sudo limine-mkinitcpio
             echo "Initramfs rebuilt ✓"
         else
             echo -e "\e[31mFailed to add resume hook\e[0m"

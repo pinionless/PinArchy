@@ -49,8 +49,7 @@ add_shutdown_hook() {
 [Unit]
 Description=Power off LG TV ($tv_name) on shutdown
 DefaultDependencies=no
-Before=shutdown.target reboot.target halt.target
-Requires=network.target
+Before=shutdown.target suspend.target halt.target sleep.target
 
 [Service]
 Type=oneshot
@@ -61,7 +60,7 @@ ExecStop=pinarchy-cmd-lgtv-shutdown $tv_ip
 TimeoutStopSec=30
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=halt.target suspend.target shutdown.target
 EOF
 
   # Enable the service
