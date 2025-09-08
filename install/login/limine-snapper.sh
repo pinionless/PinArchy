@@ -12,7 +12,9 @@ EOF
   fi
 
   if [[ "$ROOT_DEVICE" =~ /dev/mapper/ ]]; then
-    LUKS_PARENT=$(lsblk -no PKNAME "$ROOT_DEVICE")
+    # Strip subvolume notation for lsblk
+    ROOT_DEVICE_CLEAN=$(echo "$ROOT_DEVICE" | sed 's/\[.*\]//')
+    LUKS_PARENT=$(lsblk -no PKNAME "$ROOT_DEVICE_CLEAN")
     LUKS_UUID=$(sudo cryptsetup luksDump "/dev/$LUKS_PARENT" | grep "UUID:" | awk '{print $2}')
   fi
 

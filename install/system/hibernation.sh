@@ -8,7 +8,7 @@ set -e
 # Check if hibernation setup was requested
 if [[ "${PINARCHY_HIBERNATION,,}" != "y" ]]; then
   echo "Hibernation setup skipped (user preference)"
-  exit 0
+  return 0
 fi
 
 echo -e "\e[32m🛏️ Setting up hibernation with swapfile in Btrfs subvolume...\e[0m"
@@ -19,7 +19,7 @@ echo -e "\e[33mValidating system prerequisites...\e[0m"
 # Check if we're on a Btrfs filesystem
 if ! findmnt -n -o FSTYPE / | grep -q "btrfs"; then
     echo -e "\e[31mRoot filesystem is not Btrfs. This script is designed for Btrfs systems only.\e[0m"
-    exit 1
+    return 1
 fi
 echo "Root filesystem is Btrfs ✓"
 
@@ -437,7 +437,7 @@ if [[ -f "$limine_config" ]]; then
                 echo "Adding resume parameters: $resume_params"
                 
                 # Find the line number of KERNEL_CMDLINE[default]
-                line_num=$(grep -n "^KERNEL_CMDLINE\[default\]=" "$limine_config" | cut -d: -f1)
+                line_num=$(grep -n "^KERNEL_CMDLINE\[default\]+=" "$limine_config" | cut -d: -f1)
                 
                 if [[ -n "$line_num" ]]; then
                     echo "Found KERNEL_CMDLINE[default] at line $line_num"
@@ -607,26 +607,3 @@ if lspci | grep -i nvidia >/dev/null 2>&1; then
 else
     echo "No NVIDIA GPU detected - skipping NVIDIA hibernation configuration ✓"
 fi
-
-# ------------------------------------------
-# Hibernation Setup Complete
-# ------------------------------------------
-
-echo -e "\e[32m\n🛏️ Hibernation setup completed successfully! ✓\e[0m"
-echo ""
-echo "Summary:"
-echo "✓ Btrfs swapfile created and configured"
-echo "✓ Kernel hooks configured for hibernation resume"
-echo "✓ Bootloader configured with resume parameters"
-if lspci | grep -i nvidia >/dev/null 2>&1; then
-    echo "✓ NVIDIA hibernation services and parameters configured"
-fi
-echo ""
-echo -e "\e[33m⚠️  IMPORTANT: Reboot required for hibernation to work properly\e[0m"
-echo ""
-echo "After reboot, test hibernation with:"
-echo "  sudo systemctl hibernate"
-echo ""
-echo "Check hibernation status with:"
-echo "  swapon --show"
-echo "  cat /proc/swaps"
