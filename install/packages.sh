@@ -103,6 +103,7 @@ sudo pacman -S --noconfirm --needed \
   waybar \
   wf-recorder \
   whois \
+  wireless-regdb \
   wiremix \
   wireplumber \
   wl-clip-persist \
