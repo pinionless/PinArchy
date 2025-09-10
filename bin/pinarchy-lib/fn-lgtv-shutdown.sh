@@ -56,7 +56,7 @@ Type=oneshot
 RemainAfterExit=true
 User=$USER
 ExecStart=/bin/true
-ExecStop=pinarchy-cmd-lgtv-shutdown $tv_ip
+ExecStop=/home/$USER/.local/share/omarchy/bin/pinarchy-cmd-lgtv-shutdown $tv_ip
 TimeoutStopSec=30
 
 [Install]

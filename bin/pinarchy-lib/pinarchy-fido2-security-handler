@@ -8,17 +8,14 @@ DEVICE="$2"
 
 CONFIG_DIR="/etc/fido2/security"
 CONFIG_FILE="$CONFIG_DIR/config.json"
-STATE_FILE="$CONFIG_DIR/device-state"
-LOG_FILE="/var/log/fido2-security.log"
 
 # Ensure directories exist
 [ ! -d "$CONFIG_DIR" ] && mkdir -p "$CONFIG_DIR"
 
-# Logging function
+# Logging function - uses systemd journal
 log_event() {
   local message="$1"
-  local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-  echo "[$timestamp] $message" | tee -a "$LOG_FILE"
+  logger -t "fido2-security" "$message"
 }
 
 # Check if configuration exists and is enabled
@@ -38,22 +35,16 @@ check_config() {
   fi
 }
 
-# Update device state
-update_device_state() {
+# Log device state changes
+log_device_event() {
   local action="$1"
   local device="$2"
-  local timestamp=$(date '+%s')
   
   if [ "$action" = "add" ]; then
-    echo "${timestamp}:${device}:connected" >> "$STATE_FILE"
     log_event "FIDO2 device connected: $device"
   else
-    echo "${timestamp}:${device}:disconnected" >> "$STATE_FILE"
     log_event "FIDO2 device disconnected: $device"
   fi
-  
-  # Keep only last 100 entries
-  tail -n 100 "$STATE_FILE" > "$STATE_FILE.tmp" && mv "$STATE_FILE.tmp" "$STATE_FILE"
 }
 
 # Check if any registered FIDO2 devices are currently connected
@@ -92,12 +83,7 @@ execute_security_action() {
   
   case "$action_type" in
     "lock")
-      log_event "Executing screen lock"
-      # Find the user session and lock screen
-      local user_session=$(who | grep ':0' | awk '{print $1}' | head -1)
-      if [ -n "$user_session" ]; then
-        sudo -u "$user_session" DISPLAY=:0 omarchy-lock-screen &
-      fi
+      DISPLAY=:0 omarchy-lock-screen &
       ;;
     "shutdown")
       local shutdown_type="$3"
@@ -134,7 +120,7 @@ handle_shutdown() {
 # Main logic
 main() {
   check_config
-  update_device_state "$ACTION" "$DEVICE"
+  log_device_event "$ACTION" "$DEVICE"
   
   # Only trigger security actions on device removal
   if [ "$ACTION" = "remove" ]; then

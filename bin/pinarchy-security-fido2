@@ -244,11 +244,28 @@ remove_fido2_key() {
     return 0
   fi
   
-  # Extract the name from selection
+  # Convert display format back to file format
+  # "My YubiKey (1050:0407)" → "My YubiKey:1050:0407"
+  echo "🐛 DEBUG: Selected key: '$selected_key'"
+  local file_line=$(echo "$selected_key" | sed 's/ (/:/; s/)$//')
   local key_name=$(echo "$selected_key" | sed 's/ (.*//')
+  echo "🐛 DEBUG: File line to remove: '$file_line'"
+  echo "🐛 DEBUG: Key name for display: '$key_name'"
   
-  # Remove from file
-  sudo grep -v "^${key_name}:" "$keys_file" > /tmp/keys_temp && sudo mv /tmp/keys_temp "$keys_file"
+  # Show current file contents
+  echo "🐛 DEBUG: Current keys file contents:"
+  cat "$keys_file" 2>/dev/null || echo "  (file not readable)"
+  
+  # Remove the exact line from file using -F for literal matching
+  if sudo grep -v -F "$file_line" "$keys_file" | sudo tee "$keys_file.tmp" >/dev/null && sudo mv "$keys_file.tmp" "$keys_file"; then
+    echo "🐛 DEBUG: File operation succeeded"
+  else
+    echo "🐛 DEBUG: File operation failed"
+  fi
+  
+  # Show updated file contents
+  echo "🐛 DEBUG: Updated keys file contents:"
+  cat "$keys_file" 2>/dev/null || echo "  (file not readable)"
   
   echo "✅ Key removed: $key_name"
   echo
@@ -273,12 +290,16 @@ EOF
 )
   
   if [ -f "$keys_file" ] && [ -s "$keys_file" ]; then
+    # Add device-specific ADD rules
     while IFS=: read -r name vendor_id product_id; do
       rules_content+="\n# $name"
       rules_content+="\nSUBSYSTEM==\"usb\", ATTR{idVendor}==\"$vendor_id\", ATTR{idProduct}==\"$product_id\", ACTION==\"add\", RUN+=\"/usr/local/bin/pinarchy-fido2-security-handler add %k\""
-      rules_content+="\nSUBSYSTEM==\"usb\", ATTR{idVendor}==\"$vendor_id\", ATTR{idProduct}==\"$product_id\", ACTION==\"remove\", RUN+=\"/usr/local/bin/pinarchy-fido2-security-handler remove %k\""
       rules_content+="\n"
     done < "$keys_file"
+    
+    # Add single REMOVE rule for any USB device
+    rules_content+="\n# Trigger on any USB device removal"
+    rules_content+="\nSUBSYSTEM==\"usb\", ACTION==\"remove\", RUN+=\"/usr/local/bin/pinarchy-fido2-security-handler remove %k\""
     
     # Write rules file
     echo -e "$rules_content" | sudo tee "$rules_file" > /dev/null

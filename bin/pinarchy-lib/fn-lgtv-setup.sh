@@ -175,33 +175,48 @@ tv_details() {
   test_connection "$tv_ip"
   echo
   
-  # Show TV options menu regardless of connection result
+  # Get feature status for menu display
+  local volume_control=$(jq -r --arg ip "$tv_ip" '.tvs[] | select(.ip == $ip) | .enabled_features.waybar_volume_control // false' "$config_file")
+  local brightness_control=$(jq -r --arg ip "$tv_ip" '.tvs[] | select(.ip == $ip) | .enabled_features.brightness_control // false' "$config_file")
+  
+  # Check systemd services status
+  local boot_status="❌"
+  if check_boot_hook_exists "$tv_ip"; then
+      boot_status="✅"
+  fi
+  
+  local shutdown_status="❌"  
+  if check_shutdown_hook_exists "$tv_ip"; then
+      shutdown_status="✅"
+  fi
+  
+  # Build menu with status indicators
   TV_OPTIONS=(
-    "Delete TV from config"
-    "Start on boot"
-    "Turn off on shutdown" 
-    "Volume control"
-    "Brightness control"
+    "Start on boot ${boot_status}"
+    "Turn off on shutdown ${shutdown_status}" 
+    "Volume control $([ "$volume_control" = "true" ] && echo "✅" || echo "❌")"
+    "Brightness control $([ "$brightness_control" = "true" ] && echo "✅" || echo "❌")"
+    "⨯ Delete TV"
     "← Back"
   )
   TV_ACTION=$(gum choose --header "Select action for $tv_name:" "${TV_OPTIONS[@]}")
   
   case "$TV_ACTION" in
-    "Delete TV from config")
-      echo "🗑️ Deleting TV from config: $tv_name"
-      remove_tv "$tv_ip"
-      ;;
-    "Start on boot")
+    "Start on boot"*)
       manage_boot_hook "$tv_ip" "$tv_name"
       ;;
-    "Turn off on shutdown")
+    "Turn off on shutdown"*)
       manage_shutdown_hook "$tv_ip" "$tv_name"
       ;;
-    "Volume control")
+    "Volume control"*)
       manage_volume_control "$tv_ip" "$tv_name"
       ;;
-    "Brightness control")
+    "Brightness control"*)
       manage_brightness_control "$tv_ip" "$tv_name"
+      ;;
+    "⨯ Delete TV")
+      echo "🗑️ Deleting TV from config: $tv_name"
+      remove_tv "$tv_ip"
       ;;
     "← Back")
       return 0

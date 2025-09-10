@@ -269,9 +269,7 @@ swapon --show
 # 1.6: Add to fstab for persistence
 echo "Configuring fstab for persistence..."
 
-echo "DEBUG: device_root = '$device_root'"
-device_uuid=$(blkid -s UUID -o value "$device_root")
-echo "DEBUG: device_uuid = '$device_uuid'"
+device_uuid=$(sudo blkid -s UUID -o value "$device_root")
 echo "Device UUID: $device_uuid"
 
 # Check if entries already exist and add if missing

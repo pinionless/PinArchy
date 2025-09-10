@@ -54,7 +54,7 @@ Wants=network.target
 [Service]
 Type=oneshot
 User=$USER
-ExecStart=pinarchy-cmd-lgtv-wol $tv_ip
+ExecStart=/home/$USER/.local/share/omarchy/bin/pinarchy-cmd-lgtv-wol $tv_ip
 RemainAfterExit=yes
 TimeoutStartSec=30
 
