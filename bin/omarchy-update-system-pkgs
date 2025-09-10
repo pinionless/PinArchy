@@ -29,3 +29,19 @@ if [[ -n $orphans ]]; then
   done
   echo
 fi
+
+# Update mise tools
+if command -v mise >/dev/null 2>&1; then
+  echo -e "\e[32m\nUpdate mise tools\e[0m"
+  mise upgrade
+  echo
+fi
+
+# Update global npm packages
+if command -v mise >/dev/null 2>&1 && mise which node >/dev/null 2>&1; then
+  echo -e "\e[32m\nUpdate global npm packages\e[0m"
+  mise exec node -- npm update -g \
+    @anthropic-ai/claude-code \
+    @google/gemini-cli
+  echo
+fi

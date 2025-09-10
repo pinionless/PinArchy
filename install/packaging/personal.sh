@@ -46,7 +46,7 @@ mise use -g node@latest
 
 echo "Installing personal applications..."
 
-# Personal applications for tickets 003, 004, 006, 007, 008
+# Personal applications
 yay -S --noconfirm --needed \
   visual-studio-code-bin \
   thunderbird \
@@ -82,52 +82,7 @@ fi
 echo "Application extensions installation complete."
 
 # =============================================================================
-# SECTION 3: GIT REPOSITORIES
-# =============================================================================
-
-echo "Installing git repositories..."
-
-# zsh-autocomplete plugin for oh-my-zsh (Ticket 003)
-if [ ! -d "/usr/share/oh-my-zsh/custom/plugins/zsh-autocomplete" ]; then
-  echo "Installing zsh-autocomplete plugin..."
-  sudo git clone --depth 1 https://github.com/marlonrichert/zsh-autocomplete.git /usr/share/oh-my-zsh/custom/plugins/zsh-autocomplete || 
-    echo -e "\e[31mFailed to install zsh-autocomplete plugin. Continuing...\e[0m"
-else
-  echo "zsh-autocomplete plugin already installed."
-fi
-
-# zsh-syntax-highlighting plugin for oh-my-zsh (Ticket 003)
-if [ ! -d "/usr/share/oh-my-zsh/custom/plugins/zsh-syntax-highlighting" ]; then
-  echo "Installing zsh-syntax-highlighting plugin..."
-  sudo git clone --depth 1 https://github.com/zsh-users/zsh-syntax-highlighting.git /usr/share/oh-my-zsh/custom/plugins/zsh-syntax-highlighting || 
-    echo -e "\e[31mFailed to install zsh-syntax-highlighting plugin. Continuing...\e[0m"
-else
-  echo "zsh-syntax-highlighting plugin already installed."
-fi
-
-# zsh-autosuggestions plugin for oh-my-zsh (Ticket 003)
-if [ ! -d "/usr/share/oh-my-zsh/custom/plugins/zsh-autosuggestions" ]; then
-  echo "Installing zsh-autosuggestions plugin..."
-  sudo git clone --depth 1 https://github.com/zsh-users/zsh-autosuggestions.git /usr/share/oh-my-zsh/custom/plugins/zsh-autosuggestions || 
-    echo -e "\e[31mFailed to install zsh-autosuggestions plugin. Continuing...\e[0m"
-else
-  echo "zsh-autosuggestions plugin already installed."
-fi
-
-# zsh-shift-select plugin for oh-my-zsh (Ticket 003)
-if [ ! -d "/usr/share/oh-my-zsh/custom/plugins/zsh-shift-select" ]; then
-  echo "Installing zsh-shift-select plugin..."
-  sudo git clone --depth 1 https://github.com/jirutka/zsh-shift-select.git /usr/share/oh-my-zsh/custom/plugins/zsh-shift-select || 
-    echo -e "\e[31mFailed to install zsh-shift-select plugin. Continuing...\e[0m"
-else
-  echo "zsh-shift-select plugin already installed."
-fi
-
-
-echo "Git repositories installation complete."
-
-# =============================================================================
-# SECTION 4: INSTALL WEBAPPS
+# SECTION 3: INSTALL WEBAPPS
 # =============================================================================
 
 echo "Installing personal webapps..."
@@ -146,7 +101,7 @@ echo "Personal webapps installation complete."
 echo "All personal installations complete."
 
 # =============================================================================
-# SECTION 5: CLI TOOLS
+# SECTION 4: CLI TOOLS
 # =============================================================================
 
 echo "Installing CLI tools..."
@@ -155,12 +110,13 @@ mise exec node -- npm install -g @anthropic-ai/claude-code
 mise exec node -- npm install -g @google/gemini-cli
 
 yay -S --noconfirm --needed \
-  trash-cli
+  trash-cli \
+  myrepos
 
 echo "CLI tools installation complete."
 
 # =============================================================================
-# SECTION 6: TUI TOOLS
+# SECTION 5: TUI TOOLS
 # =============================================================================
 
 echo "Installing TUI tools..."
@@ -168,6 +124,71 @@ echo "Installing TUI tools..."
 echo "No TUI tools configured yet."
 
 echo "TUI tools installation complete."
+
+# =============================================================================
+# SECTION 6: GIT REPOSITORIES
+# =============================================================================
+
+echo "Installing git repositories..."
+
+# zsh-autocomplete plugin for oh-my-zsh (Ticket 003)
+if [ ! -d "/usr/share/oh-my-zsh/custom/plugins/zsh-autocomplete" ]; then
+  echo "Installing zsh-autocomplete plugin..."
+  if sudo git clone --depth 1 https://github.com/marlonrichert/zsh-autocomplete.git /usr/share/oh-my-zsh/custom/plugins/zsh-autocomplete; then
+    if command -v mr >/dev/null 2>&1; then
+      mr register /usr/share/oh-my-zsh/custom/plugins/zsh-autocomplete
+    fi
+  else
+    echo -e "\e[31mFailed to install zsh-autocomplete plugin. Continuing...\e[0m"
+  fi
+else
+  echo "zsh-autocomplete plugin already installed."
+fi
+
+# zsh-syntax-highlighting plugin for oh-my-zsh (Ticket 003)
+if [ ! -d "/usr/share/oh-my-zsh/custom/plugins/zsh-syntax-highlighting" ]; then
+  echo "Installing zsh-syntax-highlighting plugin..."
+  if sudo git clone --depth 1 https://github.com/zsh-users/zsh-syntax-highlighting.git /usr/share/oh-my-zsh/custom/plugins/zsh-syntax-highlighting; then
+    if command -v mr >/dev/null 2>&1; then
+      mr register /usr/share/oh-my-zsh/custom/plugins/zsh-syntax-highlighting
+    fi
+  else
+    echo -e "\e[31mFailed to install zsh-syntax-highlighting plugin. Continuing...\e[0m"
+  fi
+else
+  echo "zsh-syntax-highlighting plugin already installed."
+fi
+
+# zsh-autosuggestions plugin for oh-my-zsh (Ticket 003)
+if [ ! -d "/usr/share/oh-my-zsh/custom/plugins/zsh-autosuggestions" ]; then
+  echo "Installing zsh-autosuggestions plugin..."
+  if sudo git clone --depth 1 https://github.com/zsh-users/zsh-autosuggestions.git /usr/share/oh-my-zsh/custom/plugins/zsh-autosuggestions; then
+    if command -v mr >/dev/null 2>&1; then
+      mr register /usr/share/oh-my-zsh/custom/plugins/zsh-autosuggestions
+    fi
+  else
+    echo -e "\e[31mFailed to install zsh-autosuggestions plugin. Continuing...\e[0m"
+  fi
+else
+  echo "zsh-autosuggestions plugin already installed."
+fi
+
+# zsh-shift-select plugin for oh-my-zsh (Ticket 003)
+if [ ! -d "/usr/share/oh-my-zsh/custom/plugins/zsh-shift-select" ]; then
+  echo "Installing zsh-shift-select plugin..."
+  if sudo git clone --depth 1 https://github.com/jirutka/zsh-shift-select.git /usr/share/oh-my-zsh/custom/plugins/zsh-shift-select; then
+    if command -v mr >/dev/null 2>&1; then
+      mr register /usr/share/oh-my-zsh/custom/plugins/zsh-shift-select
+    fi
+  else
+    echo -e "\e[31mFailed to install zsh-shift-select plugin. Continuing...\e[0m"
+  fi
+else
+  echo "zsh-shift-select plugin already installed."
+fi
+
+
+echo "Git repositories installation complete."
 
 # =============================================================================
 # SECTION 7: SET DEFAULT SHELL

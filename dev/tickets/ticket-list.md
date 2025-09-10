@@ -11,12 +11,12 @@ Completed tickets should be marked and moved to completed section.
 ### High Priority
 
 ### Medium Priority
-- 🔴 [TICKET-026](./TICKET-026-npm-updates-oh-my-zsh-git-pull.md) - NPM Updates and Oh-My-Zsh Git Pull
 
 ### Low Priority
 - 🔴 [TICKET-019](./TICKET-019-limine-multi-boot-menu.md) - Limine Multi-Boot Menu Integration
 
 ## Completed Tickets
+- 🟢 [TICKET-026](./TICKET-026-npm-updates-oh-my-zsh-git-pull.md) - NPM Updates and Oh-My-Zsh Git Pull
 - 🟢 [TICKET-025](./TICKET-025-nvidia-hibernation-support.md) - NVIDIA Hibernation Support
 - 🟢 [TICKET-020](./TICKET-020-hibernation-swapfile-subvolume.md) - Hibernation with Swapfile in Subvolume
 - 🟢 [TICKET-024](./TICKET-024-fix-fido2-setup-security-pin-prompts.md) - Fix FIDO2 Setup - Skip PIN/Touch Prompts for Security Component Only
