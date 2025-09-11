@@ -7,38 +7,14 @@ check_boot_hook_exists() {
   local service_name="lgtv-poweron@${tv_ip}.service"
   
   if systemctl is-enabled "$service_name" &>/dev/null; then
-    return 0  # Hook exists
+    echo "true"  # Hook exists
   else
-    return 1  # Hook does not exist
-  fi
-}
-
-manage_boot_hook() {
-  local tv_ip="$1"
-  local tv_name="$2"
-  
-  if check_boot_hook_exists "$tv_ip"; then
-    # Hook exists, ask to remove
-    echo "✅ TV is currently set to turn on at boot"
-    if gum confirm "Do you want to disable boot startup?"; then
-      remove_boot_hook "$tv_ip" "$tv_name"
-    else
-      echo "ℹ️ Boot startup remains enabled"
-    fi
-  else
-    # Hook does not exist, ask to add
-    echo "❌ TV is not set to turn on at boot"
-    if gum confirm "Do you want to enable boot startup?"; then
-      add_boot_hook "$tv_ip" "$tv_name"
-    else
-      echo "ℹ️ Boot startup remains disabled"
-    fi
+    echo "false"  # Hook does not exist
   fi
 }
 
 add_boot_hook() {
   local tv_ip="$1"
-  local tv_name="$2"
   
   echo "🚀 Setting up TV startup on boot..."
   
@@ -47,14 +23,14 @@ add_boot_hook() {
   
   sudo tee "/etc/systemd/system/$service_name" <<EOF >/dev/null
 [Unit]
-Description=Power on LG TV ($tv_name) at boot
+Description=Power on LG TV at boot
 After=network.target
 Wants=network.target
 
 [Service]
 Type=oneshot
 User=$USER
-ExecStart=/home/$USER/.local/share/omarchy/bin/pinarchy-cmd-lgtv-wol $tv_ip
+ExecStart=/home/$USER/.local/share/omarchy/bin-pinarchy/lgtv/pinarchy-cmd-lgtv-wol $tv_ip
 RemainAfterExit=yes
 TimeoutStartSec=30
 
@@ -73,7 +49,6 @@ EOF
 
 remove_boot_hook() {
   local tv_ip="$1"
-  local tv_name="$2"
   
   echo "🗑️ Removing TV startup on boot..."
   

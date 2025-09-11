@@ -48,7 +48,7 @@ Key components:
 ## Acceptance Criteria
 - [x] `bscpylgtvcommand` installed automatically during setup
 - [x] TV management option added to omarchy-menu (under setup menu)
-- [x] TV configuration script created for LG TV setup (`pinarchy-setup-lgtv`)
+- [x] TV configuration script created for LG TV setup (`pinarchy-lgtv-setup`)
 - [x] System configuration stored in `~/.config/lgtv/config.json` (JSON format)
 - [x] TV automatically turns on during system boot/wake (systemd integration)
 - [x] TV automatically turns off during system shutdown/sleep (systemd integration)

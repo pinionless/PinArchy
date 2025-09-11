@@ -1,0 +1,58 @@
+#!/bin/bash
+
+# LG TV Volume Control
+# Usage: pinarchy-lgtv-volume <TV_IP>
+
+set -e
+
+TV_IP="$1"
+
+main() {
+  if [[ -t 0 && -t 1 ]]; then
+    if [ -z "$TV_IP" ]; then
+      echo "❌ Usage: pinarchy-lgtv-volume <TV_IP>"
+      exit 1
+    fi
+    clear
+    omarchy-show-logo
+    echo "📺 LG TV Volume Control"
+    echo "   IP: $TV_IP"
+    echo
+  fi
+
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  source "$SCRIPT_DIR/fn-lgtv-volume.sh"
+  
+  local config_file="$HOME/.config/lgtv/config.json"
+  
+  local volume_control=$(jq -r --arg ip "$TV_IP" '.tvs[] | select(.ip == $ip) | .enabled_features.waybar_volume_control' "$config_file")
+
+  if [ -z "$volume_control" ]; then
+    echo "❌ TV with IP $TV_IP not found in configuration"
+    return 1
+  fi
+
+  if "$volume_control"; then
+    echo "Current status: ✅ Waybar volume control is ENABLED"
+  else
+    echo "Current status: ❌ Waybar volume control is DISABLED"
+  fi
+  echo
+  
+  # Show enable/disable confirmation with custom buttons
+  if gum confirm "Waybar volume control for this TV:" --affirmative="Enable" --negative="Disable"; then
+    # Get volume step from user
+    VOLUME_STEP=$(gum input --placeholder "Enter volume step (1-100)" --prompt "Step: ")
+    
+    if [ -z "$VOLUME_STEP" ]; then
+      echo "❌ Volume step is required"
+      return 1
+    fi
+    
+    add_volume_control "$TV_IP" "$VOLUME_STEP"
+  else
+    remove_volume_control "$TV_IP"
+  fi
+}
+
+main

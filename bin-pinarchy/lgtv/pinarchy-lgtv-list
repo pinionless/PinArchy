@@ -1,0 +1,20 @@
+#!/bin/bash
+
+set -e
+
+# List configured LG TVs for menu selection
+# Returns one TV option per line in format: "TV Name (IP)"
+
+if [[ -t 0 && -t 1 ]]; then
+  clear
+  omarchy-show-logo
+
+  echo "📺 LG TVs saved in $HOME/.config/lgtv/config.json"
+  echo
+fi
+
+config_file="$HOME/.config/lgtv/config.json"
+
+if [ -f "$config_file" ] && [ -s "$config_file" ]; then
+  jq -r '.tvs[] | "\(.name) (\(.ip))"' "$config_file" 2>/dev/null
+fi

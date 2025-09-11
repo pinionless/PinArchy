@@ -7,8 +7,8 @@ set -e
 
 if [ $# -ne 2 ]; then
     echo "❌ Usage: pinarchy-cmd-lgtv-launch <TV_IP> <APP_ID>"
-    echo "Example: pinarchy-cmd-lgtv-launch 192.168.1.100 airplay"
-    echo "Example: pinarchy-cmd-lgtv-launch 192.168.1.100 amazon.alexa.view"
+    echo "  Example: pinarchy-lgtv-cmd-launch 192.168.1.100 airplay"
+    echo "  Example: pinarchy-lgtv-cmd-launch 192.168.1.100 amazon.alexa.view"
     exit 1
 fi
 

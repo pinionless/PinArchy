@@ -166,7 +166,7 @@ show_setup_menu() {
     ;;
   *Power*) show_setup_power_menu ;;
   *Monitors*) edit_in_nano ~/.config/hypr/monitors.conf ;;
-  *LG*) present_terminal pinarchy-setup-lgtv ;;
+  *LG*) present_terminal pinarchy-lgtv-setup ;;
   *Keybindings*) edit_in_nano ~/.config/hypr/bindings.conf ;;
   *Input*) edit_in_nano ~/.config/hypr/input.conf ;;
   *DNS*) present_terminal omarchy-setup-dns ;;
@@ -211,7 +211,7 @@ show_install_menu() {
   *Package*) terminal omarchy-pkg-install ;;
   *AUR*) terminal omarchy-pkg-aur-install ;;
   *Web*) present_terminal omarchy-webapp-install ;;
-  *TV*) present_terminal pinarchy-install-tvapp ;;
+  *TV*) present_terminal pinarchy-lgtv-tvapp-install ;;
   *TUI*) present_terminal omarchy-tui-install ;;
   *Service*) show_install_service_menu ;;
   *Style*) show_install_style_menu ;;
@@ -344,7 +344,7 @@ show_remove_menu() {
   case $(menu "Remove" "$options") in
   *Package*) terminal omarchy-pkg-remove ;;
   *Web*) present_terminal omarchy-webapp-remove ;;
-  *TV*) present_terminal pinarchy-remove-tvapp ;;
+  *TV*) present_terminal pinarchy-lgtv-tvapp-remove ;;
   *TUI*) present_terminal omarchy-tui-remove ;;
   *Theme*) present_terminal omarchy-theme-remove ;;
   *Fingerprint*) present_terminal "omarchy-setup-fingerprint --remove" ;;

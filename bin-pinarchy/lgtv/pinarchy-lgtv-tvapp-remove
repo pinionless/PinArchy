@@ -1,0 +1,42 @@
+#!/bin/bash
+
+# LG TV App Remover for PinArchy
+# Removes desktop launcher for TV apps
+
+set -e
+
+TV_IP="$1"
+
+main() {
+  while true; do
+    if [[ -t 0 && -t 1 ]]; then
+      clear
+      omarchy-show-logo
+      echo "📺 LG TV App Remover"
+    fi
+
+    local config_file="$HOME/.config/lgtv/config.json"
+
+    # Source library functions
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    source "$SCRIPT_DIR/fn-lgtv-apps.sh"
+
+
+    # Get list of configured TVs
+    tv_count=$(jq '.tvs | length' "$config_file")
+    if [ "$tv_count" -eq 0 ]; then
+      echo
+      echo "❌ No TVs configured"
+      echo "   Run 'pinarchy-lgtv-setup' to add a TV first"
+      return
+    fi
+
+    echo
+    if ! remove_tvapp "$TV_IP"; then
+      return
+    fi
+    omarchy-show-done
+  done
+}
+
+main

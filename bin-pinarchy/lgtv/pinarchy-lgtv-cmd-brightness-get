@@ -7,7 +7,7 @@ set -e
 
 if [ $# -eq 0 ]; then
     echo "❌ Usage: pinarchy-cmd-lgtv-brightness-get <TV_IP>"
-    echo "Example: pinarchy-cmd-lgtv-brightness-get 192.168.1.100"
+    echo "  Example: pinarchy-lgtv-cmd-brightness-get 192.168.1.100"
     exit 1
 fi
 

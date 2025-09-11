@@ -1,0 +1,53 @@
+#!/bin/bash
+
+# LG TV Wake-on-LAN Boot Hook
+# Usage: pinarchy-lgtv-wol <TV_IP>
+
+set -e
+
+TV_IP="$1"
+
+main() {
+  if [[ -t 0 && -t 1 ]]; then
+    if [ -z "$TV_IP" ]; then
+      echo "❌ Usage: pinarchy-lgtv-wol <TV_IP>"
+      exit 1
+    fi
+    clear
+    omarchy-show-logo
+    echo "📺 LG TV Wake-on-LAN Boot Hook"
+    echo "   IP: $TV_IP"
+    echo
+  fi
+
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  source "$SCRIPT_DIR/fn-lgtv-boot.sh"
+  
+  local config_file="$HOME/.config/lgtv/config.json"
+  
+  local tv_name=$(jq -r --arg ip "$TV_IP" '.tvs[] | select(.ip == $ip) | .name' "$config_file")
+
+  if [ -z "$tv_name" ]; then
+    echo "❌ TV with IP $TV_IP not found in configuration"
+    return 1
+  fi
+
+  # Check if boot hook exists
+  local hook_exists=$(check_boot_hook_exists "$TV_IP")
+  
+  if [ "$hook_exists" = "true" ]; then
+    echo "Current status: ✅ Boot hook is ENABLED"
+  else
+    echo "Current status: ❌ Boot hook is DISABLED"
+  fi
+  echo
+  
+  # Show enable/disable confirmation with custom buttons
+  if gum confirm "Wake TV on system boot:" --affirmative="Enable" --negative="Disable"; then
+    add_boot_hook "$TV_IP" "$tv_name"
+  else
+    remove_boot_hook "$TV_IP"
+  fi
+}
+
+main

@@ -23,7 +23,7 @@ main_menu() {
     )
 
     # Use gum for consistent multi-select interface
-    SELECTED_STRING=$(gum choose --no-limit --header "Select FIDO2 components to configure..." --selected-prefix="✗ " --selected="Exit" "${COMPONENTS[@]}")
+    SELECTED_STRING=$(gum choose --no-limit --header "Select FIDO2 components to configure..." --selected-prefix="✗ " --selected="Exit" "${COMPONENTS[@]}") #TODO  --selected-prefix="☑ " --unselected-prefix="☐ "
 
     # Convert newline-separated string to array
     SELECTED=()

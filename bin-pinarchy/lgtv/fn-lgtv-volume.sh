@@ -2,45 +2,9 @@
 
 set -e
 
-check_volume_control_exists() {
-  local tv_ip="$1"
-  local config_file="$HOME/.config/lgtv/config.json"
-  
-  local volume_enabled=$(jq -r --arg ip "$tv_ip" '.tvs[] | select(.ip == $ip) | .enabled_features.waybar_volume_control' "$config_file")
-  
-  if [ "$volume_enabled" = "true" ]; then
-    return 0  # Volume control enabled
-  else
-    return 1  # Volume control disabled
-  fi
-}
-
-manage_volume_control() {
-  local tv_ip="$1"
-  local tv_name="$2"
-  
-  if check_volume_control_exists "$tv_ip"; then
-    # Volume control enabled, ask to remove
-    echo "✅ Waybar volume control is currently enabled for this TV"
-    if gum confirm "Do you want to disable waybar volume control?"; then
-      remove_volume_control "$tv_ip" "$tv_name"
-    else
-      echo "ℹ️ Waybar volume control remains enabled"
-    fi
-  else
-    # Volume control disabled, ask to add
-    echo "❌ Waybar volume control is not enabled for this TV"
-    if gum confirm "Do you want to enable waybar volume control?"; then
-      add_volume_control "$tv_ip" "$tv_name"
-    else
-      echo "ℹ️ Waybar volume control remains disabled"
-    fi
-  fi
-}
-
 add_volume_control() {
   local tv_ip="$1"
-  local tv_name="$2"
+  local step="$2"
   
   echo "🔊 Setting up waybar volume control..."
   
@@ -61,17 +25,17 @@ add_volume_control() {
     .["custom/lgtv-volume-down"] = {
       "format": "󰝞",
       "tooltip": "TV Volume Down",
-      "on-click": "pinarchy-cmd-lgtv-volume-down \($ip)"
+      "on-click": "pinarchy-lgtv-cmd-volume \($ip) -$step"
     } |
     .["custom/lgtv-tv-icon"] = {
       "format": "",
       "tooltip": "Turn screen off",
-      "on-click": "pinarchy-cmd-lgtv-screenoff \($ip)"
+      "on-click": "pinarchy-lgtv-cmd-screenoff \($ip)"
     } |
     .["custom/lgtv-volume-up"] = {
       "format": "󰝝",
       "tooltip": "TV Volume Up", 
-      "on-click": "pinarchy-cmd-lgtv-volume-up \($ip)"
+      "on-click": "pinarchy-lgtv-cmd-volume \($ip) +$step"
     }
   ' "$waybar_config" > "$waybar_config.tmp" && mv "$waybar_config.tmp" "$waybar_config"
   
@@ -101,15 +65,13 @@ EOF
   # Restart Waybar to apply changes
   omarchy-restart-waybar
   
-  echo "✅ Waybar volume control enabled for $tv_name"
-  echo "   TV controls added to Waybar!"
+  echo "✅ Waybar volume control enabled"
   
   return 0
 }
 
 remove_volume_control() {
   local tv_ip="$1"
-  local tv_name="$2"
   
   echo "🔇 Removing waybar volume control..."
   
@@ -139,8 +101,7 @@ remove_volume_control() {
   # Restart Waybar to apply changes
   omarchy-restart-waybar
   
-  echo "✅ Waybar volume control disabled for $tv_name"
-  echo "   TV controls removed from Waybar!"
+  echo "✅ Waybar volume control disabled"
   
   return 0
 }

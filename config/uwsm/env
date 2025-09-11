@@ -1,6 +1,13 @@
 export OMARCHY_PATH=$HOME/.local/share/omarchy
-export PATH=$OMARCHY_PATH/bin/:$PATH
 export TERMINAL=ghostty
+export PATH=$PATH:$OMARCHY_PATH/bin/
+export PATH=$PATH:$OMARCHY_PATH/bin-pinarchy/
+
+for dir in $OMARCHY_PATH/bin-pinarchy/*/; do
+  if [ -d "$dir" ]; then
+    export PATH="$PATH:$dir"
+  fi
+done
 
 if command -v mise &> /dev/null; then
   eval "$(mise activate bash)"

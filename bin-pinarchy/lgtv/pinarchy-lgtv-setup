@@ -1,0 +1,44 @@
+#!/bin/bash
+
+set -e
+
+# LG TV Management Script for PinArchy
+# Interactive setup for LG TV power management
+
+main() {
+  while true; do
+    if [[ -t 0 && -t 1 ]]; then
+      clear
+      omarchy-show-logo
+      echo "📺 PinArchy LG TV Management"
+      echo
+    fi
+    
+    OPTIONS=("+  Add new TV")
+    mapfile -t TV_LIST < <(pinarchy-lgtv-list)
+    OPTIONS+=("${TV_LIST[@]/#/  }")
+    OPTIONS+=("⨯  Exit")
+    SELECTED=$(gum choose --header "Select an option:" "${OPTIONS[@]}")
+    
+    case "$SELECTED" in
+      "+  Add new TV")
+        pinarchy-lgtv-tv-add
+        omarchy-show-done
+        ;;
+      "⨯  Exit")
+        echo "👋 Goodbye!"
+        exit 0
+        ;;
+      *)
+        # Handle TV selection (format: "TV Name (IP)")
+        if [[ "$SELECTED" =~ ^.*\ \(([0-9.]+)\)$ ]]; then
+          TV_IP="${BASH_REMATCH[1]}"
+          pinarchy-lgtv-tv-details "$TV_IP"
+        fi
+        ;;
+    esac
+  done
+}
+
+# Start the main menu loop
+main

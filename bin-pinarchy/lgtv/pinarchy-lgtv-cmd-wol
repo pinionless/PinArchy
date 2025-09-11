@@ -7,7 +7,7 @@ set -e
 
 if [ $# -eq 0 ]; then
     echo "❌ Usage: pinarchy-cmd-lgtv-wol <TV_IP>"
-    echo "Example: pinarchy-cmd-lgtv-wol 192.168.1.100"
+    echo "  Example: pinarchy-lgtv-cmd-wol 192.168.1.100"
     exit 1
 fi
 
@@ -18,7 +18,7 @@ echo "⚡ Waking up LG TV at $TV_IP..."
 # Get MAC address from JSON config file
 config_file="$HOME/.config/lgtv/config.json"
 if [ ! -f "$config_file" ]; then
-    echo "❌ Config file not found. Please add TV first using pinarchy-setup-lgtv"
+    echo "❌ Config file not found. Please add TV first using pinarchy-lgtv-setup"
     exit 1
 fi
 

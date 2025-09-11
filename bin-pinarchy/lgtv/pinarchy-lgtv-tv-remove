@@ -1,0 +1,47 @@
+#!/bin/bash
+
+# Remove LG TV from configuration
+# Usage: pinarchy-lgtv-remove <TV_IP>
+
+set -e
+
+TV_IP="$1"
+
+main() {
+  if [[ -t 0 && -t 1 ]]; then
+    if [ -z "$TV_IP" ]; then
+      echo "❌ Usage: pinarchy-lgtv-remove <TV_IP>"
+      exit 1
+    fi
+    clear
+    omarchy-show-logo
+    echo "📺 Remove LG TV"
+    echo "   IP: $TV_IP"
+    echo
+  fi
+  
+  local config_file="$HOME/.config/lgtv/config.json"
+  
+  # Get TV name for confirmation
+  local tv_name=$(jq -r --arg ip "$TV_IP" '.tvs[] | select(.ip == $ip) | .name' "$config_file")
+
+  if [ -z "$tv_name" ]; then
+    echo "❌ TV with IP $TV_IP not found in configuration"
+    return 1
+  fi
+
+  # Ask for confirmation
+  echo "⚠️ You are about to remove TV: $tv_name ($TV_IP)"
+  if ! gum confirm "Are you sure you want to remove this TV?"; then
+    echo "ℹ️ TV removal cancelled"
+    return 1
+  fi
+  
+  # Remove TV with matching IP from JSON config
+  jq --arg ip "$TV_IP" '.tvs |= map(select(.ip != $ip))' "$config_file" > "$config_file.tmp" && mv "$config_file.tmp" "$config_file"
+  echo "✅ TV with IP $TV_IP removed from configuration"
+  
+  return 0
+}
+
+main

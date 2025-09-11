@@ -1,0 +1,90 @@
+#!/bin/bash
+
+# Show LG TV details and management options
+# Usage: pinarchy-lgtv-tvs-details <TV_IP>
+
+set -e
+
+TV_IP="$1"
+
+main() {
+  while true; do
+    if [[ -t 0 && -t 1 ]]; then
+      if [ -z "$TV_IP" ]; then
+        echo "❌ Usage: pinarchy-lgtv-details <TV_IP>"
+        exit 1
+      fi
+      clear
+      omarchy-show-logo
+      echo "📺 LG TV Details"
+    fi
+    
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    source "$SCRIPT_DIR/fn-lgtv-shutdown.sh"
+    source "$SCRIPT_DIR/fn-lgtv-boot.sh"
+
+    # Get TV details from JSON config file
+    local config_file="$HOME/.config/lgtv/config.json"
+    local tv_name=$(jq -r --arg ip "$TV_IP" '.tvs[] | select(.ip == $ip) | .name' "$config_file")
+    local mac_address=$(jq -r --arg ip "$TV_IP" '.tvs[] | select(.ip == $ip) | .mac' "$config_file")
+    local date_added=$(jq -r --arg ip "$TV_IP" '.tvs[] | select(.ip == $ip) | .date_added' "$config_file")
+    local volume_control=$(jq -r --arg ip "$TV_IP" '.tvs[] | select(.ip == $ip) | .enabled_features.waybar_volume_control // false' "$config_file")
+    local brightness_control=$(jq -r --arg ip "$TV_IP" '.tvs[] | select(.ip == $ip) | .enabled_features.brightness_control // false' "$config_file")
+    
+    echo "   IP: $TV_IP"
+    echo "   Name: $tv_name"
+    echo "   MAC Address: $mac_address"
+    echo "   Date Added: $date_added"
+    echo
+    
+    OPTIONS=(
+      "$([ "$(check_boot_hook_exists "$TV_IP")" = "true" ] && echo "󰄲" || echo "󰄱") Wake On Lan on Boot"
+      "$([ "$(check_shutdown_hook_exists "$TV_IP")" = "true" ] && echo "󰄲" || echo "󰄱") Turn Off on Shutdown"
+      "$([ "$volume_control" = "true" ] && echo "󰄲" || echo "󰄱") Volume control"
+      "$([ "$brightness_control" = "true" ] && echo "󰄲" || echo "󰄱") Brightness control"
+      "+ Install TV Apps"
+      "⨯ Remove TV Apps"
+      "⨯ Delete TV"
+      "← Back"
+    )
+    TV_ACTION=$(gum choose --header "Select action for $tv_name:" "${OPTIONS[@]}")
+    
+    case "$TV_ACTION" in
+      *"Wake On Lan on Boot")
+        pinarchy-lgtv-wol_hook "$TV_IP"
+        omarchy-show-done
+        ;;
+      *"Turn Off on Shutdown")
+        pinarchy-lgtv-shutdown_hook "$TV_IP"
+        omarchy-show-done
+        ;;
+      *"Volume control")
+        pinarchy-lgtv-volume "$TV_IP"
+        omarchy-show-done
+        ;;
+      *"Brightness control")
+        pinarchy-lgtv-brightness "$TV_IP"
+        omarchy-show-done
+        ;;
+      "+ Install TV Apps")
+        pinarchy-lgtv-tvapp-install "$TV_IP"
+        ;;
+      "⨯ Remove TV Apps")
+        pinarchy-lgtv-tvapp-remove "$TV_IP"
+        ;;
+      "⨯ Delete TV")
+        if pinarchy-lgtv-tv-remove "$TV_IP"; then
+          omarchy-show-done
+          return
+        else
+          omarchy-show-done
+        fi
+        ;;
+      "← Back")
+        return
+        ;;
+    esac
+  done
+}
+
+main

@@ -2,36 +2,13 @@
 
 set -e
 
-get_tv_apps() {
+add_tvapp() {
   local tv_ip="$1"
-  
-  echo "📱 Getting available apps from TV at $tv_ip..." >&2
-  
-  # Get all apps from TV
-  local apps_json=$(bscpylgtvcommand "$tv_ip" get_apps_all true -p "$HOME/.config/lgtv/bscpylgtv.sqlite" 2>/dev/null)
-  
-  if [ -z "$apps_json" ]; then
-    echo "❌ Failed to get apps from TV. Make sure TV is on and connected." >&2
-    return 1
-  fi
-  
-  # Extract title and id, filter visible apps only, create fzf format
-  echo "$apps_json" | jq -r '.[] | select(.visible == true) | "\(.title) | \(.id)"' | sort | fzf --prompt="Select TV App: " --height=15 --reverse --border
-  
-  return $?
-}
-
-add_tv_app() {
-  local tv_ip="$1"
-  local tv_name="$2"
-  
-  echo "📱 Adding TV app to desktop launcher..."
-  
+    
   # Get selected app using fzf
-  local selected_app=$(get_tv_apps "$tv_ip")
-  
+  local selected_app=$(pinarchy-lgtv-tvapp-list "$tv_ip")
+
   if [ -z "$selected_app" ]; then
-    echo "❌ No app selected or failed to get apps"
     return 1
   fi
   
@@ -64,14 +41,14 @@ add_tv_app() {
   echo
   
   # Create desktop file
-  local desktop_file="$HOME/.local/share/applications/lgtv-${app_id}.desktop"
+  local desktop_file="$HOME/.local/share/applications/lgtv-${tv_ip}-${app_id}.desktop"
   
   cat > "$desktop_file" << EOF
 [Desktop Entry]
 Version=1.0
 Type=Application
 Name=$app_title
-Comment=Launch $app_title on $tv_name TV
+Comment=Launch $app_title on TV
 Exec=pinarchy-cmd-lgtv-launch $tv_ip $app_id
 ${icon_line}
 Terminal=false
@@ -93,7 +70,8 @@ get_installed_tvapps() {
   echo "📱 Select installed TV app to remove:" >&2
   
   # Step 1: Find all lgtv-*.desktop files
-  local files=($(find "$apps_dir" -name "lgtv-*.desktop" 2>/dev/null))
+  local files=()
+  readarray -t files < <(find "$apps_dir" -name "lgtv-*.desktop" 2>/dev/null)
   
   # Check if any files found
   if [ ${#files[@]} -eq 0 ]; then
@@ -105,12 +83,12 @@ get_installed_tvapps() {
   for file in "${files[@]}"; do
     local app_name=$(grep "^Name=" "$file" | cut -d'=' -f2-)
     if [ -n "$app_name" ]; then
-      apps_list="${apps_list}${app_name}|${file}"$'\n'
+      apps_list="${apps_list}${app_name}⠀${file}"$'\n'
     fi
   done
   
   # Use fzf to select app (show name, return full line)
-  local selected=$(echo -n "$apps_list" | fzf --prompt="Select TV App to Remove: " --height=15 --reverse --border --delimiter='|' --with-nth=1)
+  local selected=$(echo -n "$apps_list" | fzf --prompt="Select TV App to Remove: " --height=15 --reverse --border --delimiter='⠀' --with-nth=1)
   
   if [ -n "$selected" ]; then
     echo "$selected"
@@ -123,15 +101,14 @@ remove_tvapp() {
   local selected_app=$(get_installed_tvapps)
   
   if [ -z "$selected_app" ]; then
-    echo "❌ No app selected"
     return 1
   fi
   
   # Parse the selected app (format: "app_name|desktop_file_path")
-  local app_name=$(echo "$selected_app" | cut -d'|' -f1)
-  local desktop_file=$(echo "$selected_app" | cut -d'|' -f2)
+  local app_name="${selected_app%%⠀*}"
+  local desktop_file="${selected_app##*⠀}"
   
-  echo "🗑️ Removing TV app: $app_name"
+  echo "🗑️ Selected: $app_name"
   
   # Remove desktop file if it exists
   if [ -f "$desktop_file" ]; then
@@ -146,11 +123,10 @@ remove_tvapp() {
       rm "$icon_value"
       echo "✅ Custom icon removed: $icon_value"
     fi
+    echo "✅ TV app '$app_name' removed successfully"
   else
     echo "⚠️ Desktop file not found: $desktop_file"
   fi
-  
-  echo "✅ TV app '$app_name' removed successfully"
   
   return 0
 }

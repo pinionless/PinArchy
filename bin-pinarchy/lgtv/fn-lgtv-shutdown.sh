@@ -7,38 +7,14 @@ check_shutdown_hook_exists() {
   local service_name="lgtv-poweroff@${tv_ip}.service"
   
   if systemctl is-enabled "$service_name" &>/dev/null; then
-    return 0  # Hook exists
+    echo "true"  # Hook exists
   else
-    return 1  # Hook does not exist
-  fi
-}
-
-manage_shutdown_hook() {
-  local tv_ip="$1"
-  local tv_name="$2"
-  
-  if check_shutdown_hook_exists "$tv_ip"; then
-    # Hook exists, ask to remove
-    echo "✅ TV is currently set to turn off on shutdown"
-    if gum confirm "Do you want to disable shutdown poweroff?"; then
-      remove_shutdown_hook "$tv_ip" "$tv_name"
-    else
-      echo "ℹ️ Shutdown poweroff remains enabled"
-    fi
-  else
-    # Hook does not exist, ask to add
-    echo "❌ TV is not set to turn off on shutdown"
-    if gum confirm "Do you want to enable shutdown poweroff?"; then
-      add_shutdown_hook "$tv_ip" "$tv_name"
-    else
-      echo "ℹ️ Shutdown poweroff remains disabled"
-    fi
+    echo "false"  # Hook does not exist
   fi
 }
 
 add_shutdown_hook() {
   local tv_ip="$1"
-  local tv_name="$2"
   
   echo "⏹️ Setting up TV poweroff on shutdown..."
   
@@ -47,7 +23,7 @@ add_shutdown_hook() {
   
   sudo tee "/etc/systemd/system/$service_name" <<EOF >/dev/null
 [Unit]
-Description=Power off LG TV ($tv_name) on shutdown
+Description=Power off LG TV on shutdown
 DefaultDependencies=no
 Before=shutdown.target suspend.target halt.target sleep.target
 
@@ -56,7 +32,7 @@ Type=oneshot
 RemainAfterExit=true
 User=$USER
 ExecStart=/bin/true
-ExecStop=/home/$USER/.local/share/omarchy/bin/pinarchy-cmd-lgtv-shutdown $tv_ip
+ExecStop=/home/$USER/.local/share/omarchy/bin-pinarchy/pinarchy-lgtv-cmd-shutdown $tv_ip
 TimeoutStopSec=30
 
 [Install]
@@ -74,9 +50,8 @@ EOF
 
 remove_shutdown_hook() {
   local tv_ip="$1"
-  local tv_name="$2"
   
-  echo "🗑️ Removing TV poweroff on shutdown..."
+  echo "🗑️ Removing TV hook poweroff on shutdown..."
   
   local service_name="lgtv-poweroff@${tv_ip}.service"
   
@@ -84,7 +59,7 @@ remove_shutdown_hook() {
   sudo systemctl disable "$service_name" &>/dev/null || true
   sudo rm -f "/etc/systemd/system/$service_name"
   
-  echo "✅ TV shutdown poweroff removed"
+  echo "✅ TV poweroff on shutdown hook removed"
   
   return 0
 }

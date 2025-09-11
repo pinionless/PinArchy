@@ -2,46 +2,9 @@
 
 set -e
 
-
-check_brightness_control_exists() {
-  local tv_ip="$1"
-  local config_file="$HOME/.config/lgtv/config.json"
-  
-  local brightness_enabled=$(jq -r --arg ip "$tv_ip" '.tvs[] | select(.ip == $ip) | .enabled_features.brightness_control' "$config_file")
-  
-  if [ "$brightness_enabled" = "true" ]; then
-    return 0  # Brightness control enabled
-  else
-    return 1  # Brightness control disabled
-  fi
-}
-
-manage_brightness_control() {
-  local tv_ip="$1"
-  local tv_name="$2"
-  
-  if check_brightness_control_exists "$tv_ip"; then
-    # Brightness control enabled, ask to remove
-    echo "✅ Waybar brightness control is currently enabled for this TV"
-    if gum confirm "Do you want to disable waybar brightness control?"; then
-      remove_brightness_control "$tv_ip" "$tv_name"
-    else
-      echo "ℹ️ Waybar brightness control remains enabled"
-    fi
-  else
-    # Brightness control disabled, ask to add
-    echo "❌ Waybar brightness control is not enabled for this TV"
-    if gum confirm "Do you want to enable waybar brightness control?"; then
-      add_brightness_control "$tv_ip" "$tv_name"
-    else
-      echo "ℹ️ Waybar brightness control remains disabled"
-    fi
-  fi
-}
-
 add_brightness_control() {
   local tv_ip="$1"
-  local tv_name="$2"
+  local step="$2"
   
   echo "🔆 Setting up waybar brightness control..."
   
@@ -62,10 +25,10 @@ add_brightness_control() {
     .["custom/lgtv-brightness-down"] = {
       "format": "󰃞",
       "tooltip": "TV Brightness Down", 
-      "on-click": "pinarchy-cmd-lgtv-brightness \($ip) -10"
+      "on-click": "pinarchy-lgtv-cmd-brightness \($ip) -$step"
     } |
     .["custom/lgtv-brightness-value"] = {
-      "exec": "pinarchy-cmd-lgtv-brightness-get \($ip)",
+      "exec": "pinarchy-lgtv-cmd-brightness-get \($ip)",
       "format": "{}%",
       "interval": 120,
       "signal": 8,
@@ -74,7 +37,7 @@ add_brightness_control() {
     .["custom/lgtv-brightness-up"] = {
       "format": "󰃠",
       "tooltip": "TV Brightness Up", 
-      "on-click": "pinarchy-cmd-lgtv-brightness \($ip) +10"
+      "on-click": "pinarchy-lgtv-cmd-brightness \($ip) +$step"
     }
   ' "$waybar_config" > "$waybar_config.tmp" && mv "$waybar_config.tmp" "$waybar_config"
   
@@ -104,15 +67,13 @@ EOF
   # Restart Waybar to apply changes
   omarchy-restart-waybar
   
-  echo "✅ Waybar brightness control enabled for $tv_name"
-  echo "   TV brightness controls added to Waybar!"
+  echo "✅ Waybar brightness control enabled"
   
   return 0
 }
 
 remove_brightness_control() {
   local tv_ip="$1"
-  local tv_name="$2"
   
   echo "🔅 Removing waybar brightness control..."
   
@@ -142,8 +103,7 @@ remove_brightness_control() {
   # Restart Waybar to apply changes
   omarchy-restart-waybar
   
-  echo "✅ Waybar brightness control disabled for $tv_name"
-  echo "   TV brightness controls removed from Waybar!"
+  echo "✅ Waybar brightness control disabled"
   
   return 0
 }

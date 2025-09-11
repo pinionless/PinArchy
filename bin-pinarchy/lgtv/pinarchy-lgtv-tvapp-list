@@ -1,0 +1,44 @@
+#!/bin/bash
+
+# Connect to LG TV for management and details
+# Usage: pinarchy-lgtv-connect <TV_IP>
+
+set -e
+
+TV_IP="$1"
+
+main() {
+  if [[ -t 0 && -t 1 ]]; then
+    if [ -z "$TV_IP" ]; then
+      echo "❌ Usage: pinarchy-lgtv-tvapp-list <TV_IP>"
+      exit 1
+    fi
+    clear
+    omarchy-show-logo
+    echo "📺 LG TV App List"
+    echo "   IP: $TV_IP"
+    echo
+  fi
+    
+  echo "📱 Getting available apps from TV at $TV_IP..." >&2
+  
+  # Get all apps from TV
+  local apps_json=$(bscpylgtvcommand "$TV_IP" get_apps_all true -p "$HOME/.config/lgtv/bscpylgtv.sqlite" 2>/dev/null)
+  
+  if [ -z "$apps_json" ]; then
+    echo "❌ Failed to get apps from TV. Make sure TV is on and connected." >&2
+    return 1
+  fi
+  
+  # Extract title and id, filter visible apps only, create fzf format
+  local selected_app=$(echo "$apps_json" | jq -r '.[] | select(.visible == true) | "\(.title) | \(.id)"' | sort | fzf --prompt="Select TV App: " --height=15 --reverse --border --bind="esc:cancel,ctrl-c:cancel")
+  
+  if [ -z "$selected_app" ]; then
+    return 0
+  fi
+  
+  echo "$selected_app"
+
+}
+
+main

@@ -1,0 +1,65 @@
+#!/bin/bash
+
+set -e
+
+# LG TV Volume Control Command for PinArchy
+# Adjusts TV volume using button press
+
+if [ $# -lt 1 ]; then
+  echo "❌ Usage: pinarchy-lgtv-cmd-volume <TV_IP> [+/-STEPS]"
+  echo "  Example: pinarchy-lgtv-cmd-volume 192.168.1.100 +10"
+  echo "  Example: pinarchy-lgtv-cmd-volume 192.168.1.100 -5"
+  echo "  Example: pinarchy-lgtv-cmd-volume 192.168.1.100    (default +2)"
+  exit 1
+fi
+
+TV_IP="$1"
+ADJUSTMENT="${2:-+2}"  # Default to +2 if no adjustment specified
+
+# Parse adjustment
+if [[ "$ADJUSTMENT" =~ ^([+-])([0-9]+)$ ]]; then
+    DIRECTION="${BASH_REMATCH[1]}"
+    STEPS="${BASH_REMATCH[2]}"
+else
+    echo "❌ Invalid adjustment format. Use +N or -N (e.g., +10, -5)"
+    exit 1
+fi
+
+# Determine button and action
+if [ "$DIRECTION" = "+" ]; then
+    BUTTON="VOLUMEUP"
+    ACTION="Increasing"
+else
+    BUTTON="VOLUMEDOWN"
+    ACTION="Decreasing"
+fi
+
+echo "🔊 $ACTION TV volume at $TV_IP by $STEPS steps..."
+
+# Execute volume changes
+success_count=0
+fail_count=0
+max_fails=10
+
+for i in $(seq 1 $STEPS); do
+  result=$(bscpylgtvcommand "$TV_IP" button "$BUTTON" -p "$HOME/.config/lgtv/bscpylgtv.sqlite" 2>/dev/null)
+  exit_code=$?
+  
+  if [ $exit_code -eq 0 ]; then
+    success_count=$((success_count + 1))
+  else
+    fail_count=$((fail_count + 1))
+    if [ $fail_count -ge $max_fails ]; then
+      echo "❌ Too many failures ($fail_count). Aborting."
+      break
+    fi
+  fi
+  sleep 0.05  # Small delay between button presses
+done
+
+if [ $success_count -eq $STEPS ]; then
+  echo "✅ TV volume adjusted by $DIRECTION$STEPS steps at $TV_IP!"
+else
+  echo "⚠️ Partially successful: $success_count/$STEPS steps completed at $TV_IP"
+  exit 1
+fi

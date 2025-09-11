@@ -1,0 +1,47 @@
+#!/bin/bash
+
+# Connect to LG TV for management and details
+# Usage: pinarchy-lgtv-connect <TV_IP>
+
+set -e
+
+TV_IP="$1"
+
+main() {
+  if [[ -t 0 && -t 1 ]]; then
+    if [ -z "$TV_IP" ]; then
+      echo "❌ Usage: pinarchy-lgtv-connect <TV_IP>"
+      exit 1
+    fi
+    clear
+    omarchy-show-logo
+    echo "📺 LG TV Connection Test"
+    echo "   IP: $TV_IP"
+    echo
+  fi
+  
+  local result=$(bscpylgtvcommand -o "$TV_IP" get_hello_info true -p "$HOME/.config/lgtv/bscpylgtv.sqlite" 2>/dev/null)
+  
+  if [ -z "$result" ]; then
+    echo "❌ No response from TV"
+    return 1
+  fi
+
+  # Parse JSON response
+  local os_release=$(echo "$result" | jq -r '.deviceOSReleaseVersion // empty' 2>/dev/null)
+  local os_version=$(echo "$result" | jq -r '.deviceOSVersion // empty' 2>/dev/null)
+  
+  if [ -z "$os_release" ] || [ -z "$os_version" ]; then
+    echo "❌ Invalid TV response"
+    return 1
+  fi
+  
+  # Show user the TV info
+  echo "✅ TV Connected Successfully!"
+  echo "   OS Release: $os_release"
+  echo "   OS Version: $os_version"
+  
+  return 0
+}
+
+main
